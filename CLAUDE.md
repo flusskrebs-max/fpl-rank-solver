@@ -25,6 +25,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
   = next-GW EO with an 80% band (XI share logistic transition + captain softmax; chips as input).
   `fit_default()`, `backtest()`; results in `docs/research/ownership-dynamics-v0.md`.
 - `notebooks/`: analysis as cell-marked `.py` files (`# %%`); open in VS Code or run with uv.
+- `src/fplrank/sim/scenarios.py`: scenario engine v0 ([A]). `simulate(projections, fixtures, S, H, seed)`
+  -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.
+  `sim/calibration.py` checks it against 2025-26 (`docs/research/scenario-calibration.md`).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
