@@ -1,7 +1,8 @@
 # Roadmap
 
-Phases are ordered by dependency, not by calendar. Each has an exit test so it is clear when it's done.
-The season is live, so phases 2 and 3 should start collecting data early even while design continues.
+Ordered by dependency, not by calendar. Each step has an exit test so it is clear when it's done.
+The season is live, so data collection runs from now on (scheduled collector, weekly projections)
+while the modelling steps are built.
 
 ## Phase 0: Setup ✅ (2026-10-05)
 
@@ -12,62 +13,78 @@ The season is live, so phases 2 and 3 should start collecting data early even wh
 
 **Exit:** `uv run pytest` green. ✅
 
-## Phase 1: Define the objective (brainstorm)
+## Phase 1: Define the objective ✅ (2026-10-05, brainstorm)
 
-- Pin down "rank X" (overall at season end? mini-league?), the decisions in scope (transfers,
-  captaincy, bench order, chips, hits), and the planning horizon
-- Decide what "better than baseline" means and how we'll measure it
-- Choose the first formulation to build (see options in `research/problem-framing.md`)
+The objective, architecture and test plan are in
+**[research/solver-design.md](research/solver-design.md)**: maximise P(final overall rank ≤ X),
+via the relative score Δ against the target group's EO; generate candidates with the upstream MILP
+(λ·EO·xP sweep), then evaluate them by simulation.
 
-**Exit:** ADR 0004 "Objective definition" written and agreed.
+**Exit:** design and test plan written ✅. ADR 0004 "Objective definition" still to record the
+choices that would be expensive to reverse.
 
-## Phase 2: Data foundations
+## Build order (solver-design §7)
 
-- Live API client tested on a machine that can reach the API; weekly snapshot routine
-- Sample managers near the target rank each GW → EO by tier, captaincy, chip usage
-  - Started: Elite 64 EO, captains and chips for 2026-27 GW1-5 in `datasets/elite_ownership/`,
-    loaded by `fplrank.data.elite` (B01)
-  - Started: top-1000 picks/chips/transfers/ranks collector with deadline EO,
-    `fplrank.collect.elite_picks`, scheduled twice weekly (B03)
-- Points-to-rank thresholds from past seasons (what total did rank X need at GW t?)
-- Projections ingestion for the chosen source(s)
-  - Started: Solio loader and vintage registry, `fplrank.data.projections` (B02)
+Components: [A] scenario engine, [B] field engine, [C] candidate generator, [D] evaluator.
+Data collection that feeds them (Elite 64 datasets B01, top-1000 collector B03 scheduled twice weekly)
+runs alongside.
 
-**Exit:** for any GW this season, we can load: our team, projections, fixtures, EO at the target tier, and the current points gap to rank X.
+### 1. Residual-based fill for unlisted EO ✅ (B01b)
 
-## Phase 3: Uncertainty model
+`fplrank.data.elite.eo_panel` spreads each group's residual EO over unlisted players by ownership,
+capped at the listing cutoff.
 
-- Per-player per-GW score distributions consistent with projection means
-- Correlations within teams and fixtures; scenario generator
-- Calibration against last season's actual results
+**Exit:** group totals match 11 + 1 + chips within 1% ✅.
 
-**Exit:** calibration report shows simulated event frequencies and tails in line with history.
+### 2. Projection loader ✅ (B02)
 
-## Phase 4: Field and rank model
+`fplrank.data.projections`: Solio exports in one long shape, with a vintage registry.
 
-- EO-weighted relative score per scenario
-- Threshold model T_X and its uncertainty; check against historical rank curves
+**Exit:** registered files join cleanly to FPL ids ✅.
 
-**Exit:** given a squad, we can estimate P(rank ≤ X after this GW) and it backtests sensibly.
+### 3. Rank-line data (in progress: B03 item 5 / B03b)
 
-## Phase 5: Rank-objective optimiser v1 (single GW)
+Live `T_X(now)` from the standings every collector run; end-of-season cut-offs for past seasons from
+the `past` field of sampled managers (spread term only).
 
-- Refactor upstream constraints into a reusable model (objective-agnostic)
-- First rank objective (likely generate-candidates-then-simulate, or an LP-friendly risk surrogate)
-- Head-to-head against the EV baseline on the same inputs
+**Exit:** `T_X(now)` rows every GW, and 2025/26 cut-offs for top 100 / 1k / 10k / 100k.
 
-**Exit:** for a set of historical GWs, v1 recommendations have higher estimated P(target) than EV recommendations, at a points cost we can quantify.
+### 4. [A] Scenario engine v0 + calibration report (B07)
 
-## Phase 6: Multi-period and chips
+Correlated simulated points per player and GW, consistent with projection means.
 
-- Horizon planning under the rank objective; risk appetite as gap and GWs remaining change
-- Chip timing (WC, FH, BB, TC) under the rank objective
+**Exit:** calibration report: simulated event frequencies and tails within bootstrap bands of
+2025-26 actuals; 10,000 scenarios × 6 GWs in under a minute.
 
-**Exit:** backtested seasons show improved P(finish ≤ X) versus EV strategy.
+### 5. [B] Field engine v0 + backtest vs persistence (B04, B06)
 
-## Phase 7: Weekly use
+Next-GW elite EO with an error bar, ownership and captaincy modelled separately.
 
-- One command (or scheduled task) that snapshots data, solves, and produces a short report:
-  recommended moves, P(target) for each option, and the EV cost of the risk taken
+**Exit:** beats "next week = this week" on MAE out of sample, especially after hauls.
+
+### 6. [C]+[D] Candidate sweep + evaluator for a single GW
+
+Upstream MILP with xP + λ·EO·xP over a λ grid, plus captain/chip options; evaluate each candidate's
+P(target) over the scenarios (no rollout yet). Known-answer tests from solver-design §5b.
+
+**Exit:** for a set of historical GWs, the chosen candidate has a higher estimated P(target) than the
+EV plan, at a points cost we can quantify.
+
+### 7. Value function V by simulation; then rollout
+
+V(gap, GWs left, chips) from simulated season remainders; multi-GW rollout policy using it.
+
+**Exit:** monotonicity invariants hold (σ(Δ) rises with the gap, falls when ahead).
+
+### 8. Policy backtests
+
+Replay 2025-26 and this season: pure EV vs fixed λ vs the full solver, at a grid of gaps and GWs left.
+
+**Exit:** the full solver's P(finish ≤ X) interval clears the EV policy's at X = 10k and 1k.
+
+### Then: weekly use
+
+One command (or scheduled task) that snapshots data, solves, and produces a short report:
+recommended moves, P(target) for each option, and the EV cost of the risk taken.
 
 **Exit:** used for real for 3 consecutive GWs.
