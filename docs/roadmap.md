@@ -29,6 +29,7 @@ The season is live, so phases 2 and 3 should start collecting data early even wh
     loaded by `fplrank.data.elite` (B01)
 - Points-to-rank thresholds from past seasons (what total did rank X need at GW t?)
 - Projections ingestion for the chosen source(s)
+  - Started: Solio loader and vintage registry, `fplrank.data.projections` (B02)
 
 **Exit:** for any GW this season, we can load: our team, projections, fixtures, EO at the target tier, and the current points gap to rank X.
 
