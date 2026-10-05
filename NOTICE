@@ -1,0 +1,11 @@
+fpl-rank-solver
+Copyright 2026 Alex
+
+This project includes and builds on open-fpl-solver
+(https://github.com/solioanalytics/open-fpl-solver), by Sertalp Bilal and contributors,
+licensed under the Apache License, Version 2.0. A copy of that licence is in
+vendor/open-fpl-solver/LICENSE. Upstream is dual-licensed; its authors state that commercial
+use requires a commercial licence (info@fploptimized.com).
+
+Historical FPL data is downloaded at runtime from
+https://github.com/vaastav/Fantasy-Premier-League and is not redistributed here.

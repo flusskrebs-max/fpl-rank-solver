@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Data: raw downloads, API snapshots and solver output stay local
+data/*
+!data/README.md
+vendor/open-fpl-solver/.cache/
+vendor/open-fpl-solver/data/results/*
+vendor/open-fpl-solver/run/tmp/*
+
+# Projection files are usually paid/licensed - never commit them
+*.csv
+!tests/fixtures/*.csv
+
+# Secrets
+.env
+team.json
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+!vendor/open-fpl-solver/data/results/.gitkeep
+!vendor/open-fpl-solver/run/tmp/.gitkeep
+!vendor/open-fpl-solver/run/tmp/.gitignore
