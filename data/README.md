@@ -6,6 +6,7 @@ Everything in here except this file is git-ignored.
 |---|---|---|
 | `raw/vaastav/<season>/` | Historical season files from vaastav/Fantasy-Premier-League | `fplrank.data.historical` |
 | `snapshots/<endpoint>/<timestamp>.json` | Dated copies of live FPL API responses | `fplrank.data.fpl_api.FplApi` |
+| `collected/*.parquet` | Elite managers' picks, chips, transfers, ranks, EO; `collected/logs/` | `fplrank.collect.elite_picks` |
 | `projections/` | Projection CSVs (Solio, FPL Review, Mikkel, our own) | you |
 | `projections/solio/GW{vintage}_{yyyymmdd}.csv` | Registered Solio exports, named by first projected GW and download date | `fplrank.data.projections.register` |
 | `projections/registry.csv` | One row per registered file: vintage, GW range, players, download time, sha256 | `fplrank.data.projections.register` |

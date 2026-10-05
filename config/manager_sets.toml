@@ -1,0 +1,10 @@
+# Manager sets for fplrank.collect.elite_picks. Team (entry) ids are public, so this file is committed.
+season = "2026-27"
+
+# Top N of the overall league (314), taken from the standings at collection time.
+# Each N becomes a set (and EO group) named "top{N}".
+overall_top = [1000]
+
+# Hand-maintained lists of team ids. The key becomes the set / EO group name.
+[named_lists]
+# elite64 = [123456, 234567]

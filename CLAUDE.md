@@ -17,6 +17,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
   `elite.py` (elite-group EO by GW from `datasets/elite_ownership/`; unlisted = censored, not zero),
   `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
   files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
+- `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
+  `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
+  the B01 long shape. Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
@@ -31,6 +34,7 @@ uv run pytest                 # all tests; -m "not slow" skips real solves
 uv run ruff check . && uv run ruff format .
 uv run python scripts/smoke_baseline.py
 uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
+uv run python -m fplrank.collect.elite_picks collect [--top N]     # FPL API: Alex's PC only
 ```
 
 ## Conventions
