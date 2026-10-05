@@ -20,6 +20,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
   the B01 long shape. Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
+- `src/fplrank/sim/scenarios.py`: scenario engine v0 ([A]). `simulate(projections, fixtures, S, H, seed)`
+  -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.
+  `sim/calibration.py` checks it against 2025-26 (`docs/research/scenario-calibration.md`).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
