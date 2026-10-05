@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
@@ -22,11 +23,11 @@ def _picks(captain, chip=None, players=range(1, 16)):
     }
 
 
-def _history(gws, chips=()):
+def _history(gws, chips=(), past=()):
     current = [
         {"event": gw, "points": 50, "total_points": 50 * gw, "rank": 1, "overall_rank": 10 * gw, "event_transfers_cost": 0} for gw in gws
     ]
-    return {"current": current, "past": [], "chips": [{"name": c, "event": gw, "time": "t"} for gw, c in chips]}
+    return {"current": current, "past": list(past), "chips": [{"name": c, "event": gw, "time": "t"} for gw, c in chips]}
 
 
 # Three managers: 101 plays GW1-2 (Bench Boost GW1), 102 joined in GW2 (Triple Captain on 2), 103 is not found
@@ -40,9 +41,14 @@ PAYLOADS = {
     },
     "fixtures/": [],
     "leagues-classic/314/standings/?page_standings=1": {
-        "standings": {"has_next": False, "results": [{"entry": e, "rank": r} for r, e in enumerate([101, 102, 103], 1)]}
+        "standings": {
+            "has_next": False,
+            "results": [
+                {"entry": e, "rank": 1 if r < 3 else 3, "rank_sort": r, "total": 300 - r} for r, e in enumerate([101, 102, 103], 1)
+            ],
+        }
     },
-    "entry/101/history/": _history([1, 2], chips=[(1, "bboost")]),
+    "entry/101/history/": _history([1, 2], chips=[(1, "bboost")], past=[{"season_name": "2025/26", "total_points": 2600, "rank": 5000}]),
     "entry/101/transfers/": [
         {"element_in": 16, "element_in_cost": 50, "element_out": 15, "element_out_cost": 45, "entry": 101, "event": 2, "time": "t"}
     ],
@@ -73,7 +79,7 @@ class FakeApi(FplApi):
 def collected(tmp_path):
     api = FakeApi(tmp_path / "snapshots")
     collector = elite_picks.Collector(api=api, snapshot_dir=tmp_path / "snapshots", out_dir=tmp_path / "out", now=NOW, log=lambda *_: None)
-    config = {"season": "2026-27", "overall_top": [3], "named_lists": {"pair": [101, 102]}}
+    config = {"season": "2026-27", "overall_top": [3], "named_lists": {"pair": [101, 102]}, "threshold_ranks": [2]}
     return collector, config, collector.collect(config)
 
 
@@ -134,5 +140,29 @@ def test_snapshot_folder_is_windows_safe(tmp_path):
 def test_load_config(tmp_path):
     path = tmp_path / "sets.toml"
     path.write_text('season = "2026-27"\noverall_top = [1000, 10000]\n[named_lists]\nelite = [1, 2]\n')
-    assert elite_picks.load_config(path) == {"season": "2026-27", "overall_top": [1000, 10000], "named_lists": {"elite": [1, 2]}}
+    assert elite_picks.load_config(path) == {
+        "season": "2026-27",
+        "overall_top": [1000, 10000],
+        "named_lists": {"elite": [1, 2]},
+        "threshold_ranks": [],
+    }
     assert elite_picks.load_config()["season"] == "2026-27"  # the committed config parses
+
+
+def test_past_seasons_and_thresholds(collected):
+    collector, _, _ = collected
+    past = pd.read_parquet(collector.out_dir / "past_seasons.parquet")
+    assert past.to_dict("records") == [{"season": "2025-26", "entry_id": 101, "total_points": 2600, "rank": 5000}]
+    thresholds = pd.read_parquet(collector.out_dir / "thresholds.parquet")
+    row = thresholds.iloc[0]
+    assert len(thresholds) == 1 and (row["gw"], row["target_rank"], row["rank"], row["total_points"]) == (2, 2, 1, 298)  # tied rank 1
+
+
+def test_season_cutoffs_interpolates_in_log_rank_and_never_extrapolates():
+    past = pd.DataFrame({"season": "2025-26", "entry_id": range(3), "rank": [500, 5_000, 50_000], "total_points": [2700, 2500, 2300]})
+    cut = elite_picks.season_cutoffs(past, ranks=(100, 1_000, 5_000, 10_000, 100_000)).set_index("target_rank")
+    assert pd.isna(cut.loc[100, "points"]) and cut.loc[100, "above_rank"] == 500  # better than anyone sampled
+    assert pd.isna(cut.loc[100_000, "points"])
+    assert cut.loc[5_000, "points"] == 2500  # exact hit
+    assert cut.loc[1_000, "points"] == pytest.approx(2700 - 200 * math.log(2) / math.log(10))
+    assert (cut.loc[10_000, "below_rank"], cut.loc[10_000, "above_rank"]) == (5_000, 50_000)

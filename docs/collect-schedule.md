@@ -26,21 +26,28 @@ If a run is interrupted, run it again: it picks up from the saved snapshots.
 ## Set up the schedule
 
 `scripts/collect_elite.cmd` runs the collector from the repo folder and appends to
-`data/collected/logs/collect.log`. Create the two tasks once, in PowerShell or Command Prompt:
+`data/collected/logs/collect.log`.
 
-```bash
-schtasks /Create /TN "fplrank collect (Fri)" /SC WEEKLY /D FRI /ST 20:00 /TR "\"C:\Users\Alex\Documents\fpl-rank-solver\scripts\collect_elite.cmd\""
-```
+**Status (2026-10-05):** both tasks are set up on Alex's PC ("fplrank collect (Fri)" and
+"fplrank collect (Tue)", 20:00), with catch-up after a missed start. A test run from Task Scheduler
+succeeded.
 
-```bash
-schtasks /Create /TN "fplrank collect (Tue)" /SC WEEKLY /D TUE /ST 20:00 /TR "\"C:\Users\Alex\Documents\fpl-rank-solver\scripts\collect_elite.cmd\""
+To recreate them (e.g. after moving the repo), run this in PowerShell:
+
+```powershell
+$repo = "C:\Users\Alex\Documents\fpl-rank-solver"
+$action = New-ScheduledTaskAction -Execute "$repo\scripts\collect_elite.cmd" -WorkingDirectory $repo
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew
+foreach ($day in "Friday", "Tuesday") {
+  $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $day -At "20:00"
+  Register-ScheduledTask -TaskName "fplrank collect ($($day.Substring(0,3)))" -Action $action -Trigger $trigger -Settings $settings -Force
+}
 ```
 
 Notes:
 
-- The tasks run only while you're logged in and the PC is awake. To catch up after the PC was off,
-  open Task Scheduler, find each task, and under **Settings** tick *Run task as soon as possible
-  after a scheduled start is missed*.
-- Test a task straight away: `schtasks /Run /TN "fplrank collect (Fri)"`, then check the log.
-- Remove them: `schtasks /Delete /TN "fplrank collect (Fri)" /F` (and the same for Tue).
-- If the repo moves, recreate the tasks with the new path.
+- `-StartWhenAvailable` means a run missed because the PC was off or asleep happens as soon as
+  it's back. Tasks run only while you're logged in.
+- Check them: `Get-ScheduledTask -TaskName "fplrank collect*" | Get-ScheduledTaskInfo`.
+- Test one straight away: `Start-ScheduledTask -TaskName "fplrank collect (Tue)"`, then check the log.
+- Remove them: `Unregister-ScheduledTask -TaskName "fplrank collect*" -Confirm:$false`.
