@@ -75,6 +75,12 @@ Correlated simulated points per player and GW, consistent with projection means.
 
 Next-GW elite EO with an error bar, ownership and captaincy modelled separately.
 
+- EO-weighted relative score per scenario
+- Next-GW EO forecast for the target tier
+  - Started: ownership dynamics v0, `fplrank.model.ownership.forecast_eo` (B04). Beats
+    "next week = this week" by ~20% on GW2-5; see `docs/research/ownership-dynamics-v0.md`
+- Threshold model T_X and its uncertainty; check against historical rank curves
+
 **Exit:** beats "next week = this week" on MAE out of sample, especially after hauls.
 
 ### 6. [C]+[D] Candidate sweep + evaluator for a single GW
