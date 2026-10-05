@@ -6,6 +6,8 @@ Each source/season has two wide CSVs (see datasets/README.md):
   group, EO in percent.
 - `<source>_meta_<season>.csv`: `season, gw, table, item` plus one manager-count column per group
   (captains, chips, free transfers, hits, transfers in/out).
+- Optional: `<source>_ownership_<season>.csv` (squad ownership by GW, rebuilt from transfers),
+  `<source>_picks_<season>.csv` (GW1 squads), `<source>_players_map_<season>.csv` (name -> fpl_id).
 
 The loaders return long tables with a `group` column, so new sources and groups need no code changes.
 
@@ -14,6 +16,7 @@ the listing cutoff), not zero. `eo_panel` fills unlisted players by spreading ea
 (expected total minus listed total) in proportion to overall FPL ownership, capped at the cutoff.
 """
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -25,6 +28,8 @@ ELITE_DIR = DATASETS_DIR / "elite_ownership"
 PLAYER_COLS = ["fpl_id", "player", "team", "pos"]
 META_KEYS = ["season", "gw", "table", "item"]
 POS_BY_ELEMENT_TYPE = {1: "G", 2: "D", 3: "M", 4: "F"}
+PLAYER_TABLES = ("captain", "transfer_in", "transfer_out", "wc_pick_pct")  # meta tables whose item is a player
+_SEASON = re.compile(r"^\d{4}-\d{2}$")
 
 
 def _path(kind: str, source: str, season: str) -> Path:
@@ -41,7 +46,7 @@ def available() -> list[tuple[str, str]]:
 
 def load_eo(source: str = "elite64", season: str = "2026-27") -> pd.DataFrame:
     """Listed players' EO, long: `season, gw, group, fpl_id, player, team, pos, eo` (eo 1.0 = 100%)."""
-    wide = pd.read_csv(_path("eo", source, season))
+    wide = pd.read_csv(_path("eo", source, season), keep_default_na=False)
     eo_cols = [c for c in wide.columns if c.endswith("_eo")]
     long = wide.melt(id_vars=["season", "gw", *PLAYER_COLS], value_vars=eo_cols, var_name="group", value_name="eo")
     long["group"] = long["group"].str.removesuffix("_eo").str.upper()
@@ -51,17 +56,61 @@ def load_eo(source: str = "elite64", season: str = "2026-27") -> pd.DataFrame:
 
 
 def load_meta(source: str = "elite64", season: str = "2026-27") -> pd.DataFrame:
-    """Manager counts, long: `season, gw, group, table, item, count`.
+    """Manager counts, long: `season, gw, group, table, item, count, fpl_id`.
 
-    `item` is always a string ("WC", "0", "-4", a player name...). The blank `chip_active` item
-    (managers playing no chip) becomes "none".
+    `item` is always a string ("WC", "0", "-4", a player name...). The `chip_active` item for managers
+    playing no chip (blank in 2026-27, "None" in 2025-26) becomes "none". For tables whose item is a
+    player (captain, transfers, WC picks), `fpl_id` comes from the season's players map, or else from
+    the names in its EO listing; " (TC)" captain items map to the same player.
     """
     wide = pd.read_csv(_path("meta", source, season), dtype={"item": str}, keep_default_na=False)
-    wide.loc[(wide["table"] == "chip_active") & (wide["item"] == ""), "item"] = "none"
+    wide.loc[(wide["table"] == "chip_active") & wide["item"].isin(["", "None"]), "item"] = "none"
     group_cols = [c for c in wide.columns if c not in META_KEYS]
     long = wide.melt(id_vars=META_KEYS, value_vars=group_cols, var_name="group", value_name="count")
     long["group"] = long["group"].str.upper()
-    return long[["season", "gw", "group", "table", "item", "count"]].sort_values(["group", "gw"], kind="stable", ignore_index=True)
+    is_player = long["table"].isin(PLAYER_TABLES)
+    long["fpl_id"] = long["item"].str.removesuffix(" (TC)").map(_player_ids(source, season)).where(is_player).astype("Int64")
+    cols = ["season", "gw", "group", "table", "item", "count", "fpl_id"]
+    return long[cols].sort_values(["group", "gw"], kind="stable", ignore_index=True)
+
+
+def _player_ids(source: str, season: str) -> dict[str, int]:
+    """Transcribed player name -> fpl_id: the season's players map if there is one, else EO listing names."""
+    path = ELITE_DIR / f"{source}_players_map_{season}.csv"
+    if path.exists():
+        pmap = pd.read_csv(path, keep_default_na=False)
+        return {p: int(i) for p, i in zip(pmap["player"], pmap["fpl_id"], strict=True) if i != ""}
+    eo = pd.read_csv(_path("eo", source, season), keep_default_na=False)
+    return dict(zip(eo["player"], eo["fpl_id"].astype(int), strict=True))
+
+
+def elite_meta(season: str = "2026-27", table: str | None = None, source: str = "elite64") -> pd.DataFrame:
+    """`load_meta` for one season, optionally one table (e.g. `elite_meta("2025-26", "transfer_in")`)."""
+    meta = load_meta(source, season)
+    if table is None:
+        return meta
+    if table not in set(meta["table"]):
+        raise ValueError(f"No {table!r} table for {source} {season}; tables: {sorted(meta['table'].unique())}")
+    return meta[meta["table"] == table].reset_index(drop=True)
+
+
+def elite_ownership(season: str = "2025-26", source: str = "elite64") -> pd.DataFrame:
+    """Squad ownership (not EO) by GW, long: `season, gw, group, fpl_id, player, pos, count, own, quality`.
+
+    `count` = managers owning the player (fractional where the rebuild spread wildcard squads),
+    `own` = share of the group (0-1). `quality` says how each GW was rebuilt (see datasets/README.md).
+    """
+    wide = pd.read_csv(_path("ownership", source, season), keep_default_na=False)
+    groups = [c.removesuffix("_own") for c in wide.columns if c.endswith("_own")]
+    parts = []
+    for g in groups:
+        part = wide[["season", "gw", "fpl_id", "web_name", "pos", "quality", f"{g}_own", f"{g}_own_pct"]].copy()
+        part.columns = ["season", "gw", "fpl_id", "player", "pos", "quality", "count", "own"]
+        part["own"] = part["own"] / 100
+        parts.append(part.assign(group=g.upper()))
+    long = pd.concat(parts, ignore_index=True).astype({"fpl_id": "Int64"})
+    cols = ["season", "gw", "group", "fpl_id", "player", "pos", "count", "own", "quality"]
+    return long[cols].sort_values(["group", "gw", "fpl_id"], ignore_index=True)
 
 
 def expected_totals(meta: pd.DataFrame) -> pd.Series:
@@ -96,15 +145,45 @@ def universe_from_bootstrap(bootstrap: dict) -> pd.DataFrame:
     ).astype({"fpl_id": "Int64"})
 
 
-def _default_universe() -> pd.DataFrame:
+def universe_from_players_raw(players_raw: pd.DataFrame, teams: pd.DataFrame) -> pd.DataFrame:
+    """Like `universe_from_bootstrap`, from a past season's vaastav `players_raw.csv` / `teams.csv`."""
+    short = dict(zip(teams["id"], teams["short_name"], strict=True))
+    return pd.DataFrame(
+        {
+            "fpl_id": players_raw["id"].astype("Int64"),
+            "player": players_raw["web_name"],
+            "team": players_raw["team"].map(short),
+            "pos": players_raw["element_type"].map(POS_BY_ELEMENT_TYPE),
+            "ownership": players_raw["selected_by_percent"].astype(float) / 100,
+        }
+    )
+
+
+def _bootstrap_season(bootstrap: dict) -> str:
+    start = min(int(e["deadline_time"][:4]) for e in bootstrap["events"])
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
+def _default_universe(season: str | None = None) -> pd.DataFrame:
+    """Every player of `season`: the latest bootstrap snapshot if it is that season, else vaastav's files.
+
+    FPL ids are re-numbered every season, so a past season needs its own player list. vaastav files
+    are downloaded once into data/raw/ (needs raw.githubusercontent.com).
+    """
+    from fplrank.data import historical
     from fplrank.data.fpl_api import latest_snapshot
 
     try:
-        return universe_from_bootstrap(latest_snapshot("bootstrap-static/"))
-    except FileNotFoundError as e:
+        bootstrap = latest_snapshot("bootstrap-static/")
+    except FileNotFoundError:
+        bootstrap = None
+    if bootstrap is not None and season in (None, _bootstrap_season(bootstrap)):
+        return universe_from_bootstrap(bootstrap)
+    if season is None:
         raise FileNotFoundError(
             "eo_panel needs the FPL player list: save a snapshot with FplApi().bootstrap() or pass universe=universe_from_bootstrap(...)"
-        ) from e
+        )
+    return universe_from_players_raw(historical.players_raw(season), historical.teams(season))
 
 
 def _water_fill(amount: float, weights: np.ndarray, caps: np.ndarray) -> np.ndarray:
@@ -145,11 +224,14 @@ def eo_panel(
     `team`), defaulting to the latest saved bootstrap-static snapshot. Missing ownership values get
     the mean; with no ownership at all the residual is spread evenly. Listed players are always
     included. `players` (FPL ids) filters the output after filling, so totals stay meaningful.
-    Pass `eo` / `meta` (from `load_eo` / `load_meta`) to skip reading files.
+    Pass `eo` / `meta` (from `load_eo` / `load_meta`) to skip reading files. As a shortcut the first
+    argument may be a season (`eo_panel("2025-26")`) or a single group (`eo_panel("AE64")`).
     """
+    if isinstance(groups, str):
+        season, groups = (groups, None) if _SEASON.match(groups) else (season, [groups])
     eo = load_eo(source, season) if eo is None else eo
     meta = load_meta(source, season) if meta is None else meta
-    universe = _default_universe() if universe is None else universe
+    universe = _default_universe(season) if universe is None else universe
     if eo["season"].nunique() != 1:
         raise ValueError("eo_panel needs a single season")
     groups = sorted(eo["group"].unique()) if groups is None else list(dict.fromkeys(groups))

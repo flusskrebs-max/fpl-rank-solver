@@ -14,7 +14,8 @@ Code and git; explain git/GitHub steps briefly when they come up.
   upstream EV model with in-memory inputs. Every rank-objective idea is compared against this.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
   season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections),
-  `elite.py` (elite-group EO by GW from `datasets/elite_ownership/`; unlisted = censored, not zero),
+  `elite.py` (elite-group EO, meta tables and 2025-26 squad ownership from `datasets/elite_ownership/`;
+  unlisted EO = censored, not zero),
   `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
   files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
