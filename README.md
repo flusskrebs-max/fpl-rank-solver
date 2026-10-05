@@ -11,9 +11,10 @@ EV-maximiser does neither. See [docs/research/problem-framing.md](docs/research/
 
 ## Status
 
-Phase 0 (setup) done. The upstream EV solver runs offline against historical data, and a toy
-spike shows a probability objective in HiGHS choosing differently from EV. Next:
-define the objective precisely (Phase 1). See [docs/roadmap.md](docs/roadmap.md).
+Setup and objective design done. The plan, architecture and test plan are in
+[docs/research/solver-design.md](docs/research/solver-design.md); progress against its build order
+is in [docs/roadmap.md](docs/roadmap.md). Data foundations (elite ownership, projections, a
+scheduled top-1000 picks collector) are in place; the scenario and field engines are next.
 
 ## Quick start
 
