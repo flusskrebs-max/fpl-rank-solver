@@ -46,3 +46,5 @@ uv run python scripts/smoke_baseline.py
   data or snapshots in the cloud; run live API calls on Alex's machine or after the domain is allowed.
 - The cloud container is ephemeral. Push to GitHub or save to the claude.ai Project before ending.
 - Cloud sandbox has 2 CPUs; scenario MILPs may need a bigger machine.
+- vaastav's 2026-27 files only covered GW1 on 2026-10-05 (the live season was further on), so
+  "next GW" in offline runs reflects the data, not the real calendar.
