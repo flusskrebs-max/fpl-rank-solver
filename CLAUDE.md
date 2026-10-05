@@ -14,7 +14,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
   upstream EV model with in-memory inputs. Every rank-objective idea is compared against this.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
   season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections),
-  `elite.py` (elite-group EO by GW from `datasets/elite_ownership/`; unlisted = censored, not zero).
+  `elite.py` (elite-group EO by GW from `datasets/elite_ownership/`; unlisted = censored, not zero),
+  `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
+  files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
@@ -28,6 +30,7 @@ uv sync --group dev
 uv run pytest                 # all tests; -m "not slow" skips real solves
 uv run ruff check . && uv run ruff format .
 uv run python scripts/smoke_baseline.py
+uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
 ```
 
 ## Conventions
