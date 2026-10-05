@@ -33,7 +33,7 @@ def main():
 
     unfinished = fixtures_df[(~fixtures_df["finished"].astype(bool)) & fixtures_df["event"].notna()]
     next_gw = int(unfinished["event"].min())
-    gws = list(range(next_gw, min(38, next_gw + args.horizon) + 1))
+    gws = list(range(next_gw, min(38, next_gw + args.horizon - 1) + 1))
     print(f"Season {args.season}: next GW is {next_gw}; projecting GWs {gws[0]}-{gws[-1]}")
 
     bootstrap = offline.build_bootstrap(players, teams, next_gw)
