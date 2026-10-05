@@ -20,6 +20,10 @@ Code and git; explain git/GitHub steps briefly when they come up.
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
   the B01 long shape. Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
+- `src/fplrank/model/ownership.py`: ownership dynamics v0. `forecast_eo(group, gw_next, state, model)`
+  = next-GW EO with an 80% band (XI share logistic transition + captain softmax; chips as input).
+  `fit_default()`, `backtest()`; results in `docs/research/ownership-dynamics-v0.md`.
+- `notebooks/`: analysis as cell-marked `.py` files (`# %%`); open in VS Code or run with uv.
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.

@@ -46,6 +46,9 @@ The season is live, so phases 2 and 3 should start collecting data early even wh
 ## Phase 4: Field and rank model
 
 - EO-weighted relative score per scenario
+- Next-GW EO forecast for the target tier
+  - Started: ownership dynamics v0, `fplrank.model.ownership.forecast_eo` (B04). Beats
+    "next week = this week" by ~20% on GW2-5; see `docs/research/ownership-dynamics-v0.md`
 - Threshold model T_X and its uncertainty; check against historical rank curves
 
 **Exit:** given a squad, we can estimate P(rank ≤ X after this GW) and it backtests sensibly.
