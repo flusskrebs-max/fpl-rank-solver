@@ -17,7 +17,7 @@ from fplrank.data.elite import eo_panel, load_eo, load_meta
 
 load_eo()     # listed players: season, gw, group, fpl_id, player, team, pos, eo (1.0 = 100%)
 load_meta()   # manager counts: season, gw, group, table, item, count
-eo_panel(groups=["AE64"], gws=[4, 5], floor=0.025)   # every player x GW, with a censored flag
+eo_panel(groups=["AE64"], gws=[4, 5])   # every FPL player x GW, unlisted filled from the residual
 ```
 
 ### Sources
@@ -62,14 +62,25 @@ per group (lower-case group name). Tables:
 Sources list only the top players per position (about 7-10). A player missing from a GW's list has
 an EO somewhere below that week's cutoff, **not** zero. Never treat a missing row as 0%.
 
-- `eo_panel` returns every requested player x GW x group. Unlisted cells get `eo = floor` (default
-  0.025, i.e. 2.5%) and `censored = True`. Choose `floor` to suit the model, or use the flag to
-  handle censoring properly.
 - A *listed* row carries a value for every group, so a listed 0% (e.g. Kinsky, AE64, GW3) is a real
   observation, not a censored one.
 - Listed players cover 90-98% of each group's total EO (a manager's total is 11 starters + captain,
   plus 1 for Triple Captain and 4 for a Bench Boost bench). `tests/test_elite_data.py` requires
   85-100%.
+
+**How `eo_panel` fills unlisted players (residual fill).** For each group and GW, the expected total
+EO is `11 + 1 + TC share + 4 x BB share` (shares from the `chip_active` counts; `expected_totals`).
+The residual, expected total minus the listed total (never below 0), is spread across every
+unlisted player in the FPL player universe in proportion to their overall FPL ownership
+(`selected_by_percent`). Each player is capped at the listing cutoff, the smallest *positive*
+listed EO for their position in that group and GW. Listed zeros are excluded because they are
+players listed for the other group's sake. Any amount removed by a cap is passed on to the
+players still below theirs, so each group/GW total matches the expected total. Filled cells
+have `censored = True` and `fill_method = "residual"`; listed cells keep their value and have
+`fill_method = "listed"`. The universe defaults to the latest saved `bootstrap-static` snapshot
+(`FplApi().bootstrap()` saves one), or pass `universe=`. Two limits: ownership is from the snapshot
+date, not each GW, and overall ownership is only a rough guide to how elite managers spread their
+remaining EO. Use the `censored` flag where that matters.
 
 ### Known quirks (Elite 64, 2026-27)
 
