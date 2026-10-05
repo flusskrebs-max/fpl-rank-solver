@@ -18,6 +18,7 @@ from fplrank.paths import SNAPSHOT_DIR
 
 BASE_URL = "https://fantasy.premierleague.com/api"
 USER_AGENT = "fplrank/0.0.1 (personal research project)"
+STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 
 
 class FplApi:
@@ -36,9 +37,8 @@ class FplApi:
         return payload
 
     def _save(self, endpoint: str, payload: dict | list) -> Path:
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        name = endpoint.strip("/").replace("/", "__") or "root"
-        path = self.snapshot_dir / name / f"{stamp}.json"
+        stamp = datetime.now(UTC).strftime(STAMP_FORMAT)
+        path = snapshot_folder(endpoint, self.snapshot_dir) / f"{stamp}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload))
         return path
@@ -64,10 +64,26 @@ class FplApi:
         return self.get(f"leagues-classic/314/standings/?page_standings={page}")
 
 
+def snapshot_folder(endpoint: str, snapshot_dir: Path = SNAPSHOT_DIR) -> Path:
+    """Folder holding `endpoint`'s snapshots. Query strings are made safe for Windows file names."""
+    name = endpoint.strip("/").replace("/", "__").replace("?", "__").replace("&", "__").replace("=", "-")
+    return snapshot_dir / (name or "root")
+
+
+def latest_snapshot_path(endpoint: str, snapshot_dir: Path = SNAPSHOT_DIR) -> Path | None:
+    """Path of the most recent snapshot for `endpoint`, or None if there is none."""
+    files = sorted(snapshot_folder(endpoint, snapshot_dir).glob("*.json"))
+    return files[-1] if files else None
+
+
+def snapshot_time(path: Path) -> datetime:
+    """UTC time a snapshot was saved, from its file name."""
+    return datetime.strptime(path.stem, STAMP_FORMAT).replace(tzinfo=UTC)
+
+
 def latest_snapshot(endpoint: str, snapshot_dir: Path = SNAPSHOT_DIR) -> dict | list:
     """Load the most recent saved snapshot for `endpoint`."""
-    folder = snapshot_dir / (endpoint.strip("/").replace("/", "__") or "root")
-    files = sorted(folder.glob("*.json"))
-    if not files:
-        raise FileNotFoundError(f"No snapshots saved for {endpoint!r} in {folder}")
-    return json.loads(files[-1].read_text())
+    path = latest_snapshot_path(endpoint, snapshot_dir)
+    if path is None:
+        raise FileNotFoundError(f"No snapshots saved for {endpoint!r} in {snapshot_folder(endpoint, snapshot_dir)}")
+    return json.loads(path.read_text())
