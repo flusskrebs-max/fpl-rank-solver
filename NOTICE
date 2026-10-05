@@ -9,3 +9,7 @@ use requires a commercial licence (info@fploptimized.com).
 
 Historical FPL data is downloaded at runtime from
 https://github.com/vaastav/Fantasy-Premier-League and is not redistributed here.
+
+datasets/elite_ownership/elite64_* are transcriptions of public graphics by @FPL_Spaceman /
+Solio Analytics (Elite 64 effective ownership, captains and transfers). The figures belong to
+their publishers and are not covered by this project's code licence. See datasets/README.md.

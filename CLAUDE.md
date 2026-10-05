@@ -13,7 +13,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
 - `src/fplrank/baseline.py`: `solve_ev(my_data, projections, bootstrap, fixtures, options)` runs the
   upstream EV model with in-memory inputs. Every rank-objective idea is compared against this.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
-  season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections).
+  season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections),
+  `elite.py` (elite-group EO by GW from `datasets/elite_ownership/`; unlisted = censored, not zero).
+- `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
 - `docs/roadmap.md` (phases), `docs/components.md` (what we need), `docs/research/` (thinking),
@@ -34,7 +36,8 @@ uv run python scripts/smoke_baseline.py
 - New modelling code goes in `src/fplrank/<area>/`, with tests in `tests/`. Mark tests that run real
   MILPs `@pytest.mark.slow` and ones that download data `@pytest.mark.network`.
 - Upstream code ported into `src/` keeps an attribution comment naming the source file and commit.
-- `data/` and all CSVs are git-ignored. Paid projection files must never be committed.
+- `data/` and all CSVs are git-ignored, except `datasets/**/*.csv` (curated, free-to-share data
+  only). Paid projection files must never be committed.
 - HiGHS solves LP, MILP and convex QP, but **not** mixed-integer QP. Variance/risk terms in a MILP
   must be linear (scenarios, MAD, CVaR, piecewise) or handled outside the MILP.
 - Snapshot any live API data used in a solve so the solve can be reproduced.

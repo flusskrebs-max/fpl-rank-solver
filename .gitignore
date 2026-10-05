@@ -17,6 +17,8 @@ vendor/open-fpl-solver/run/tmp/*
 # Projection files are usually paid/licensed - never commit them
 *.csv
 !tests/fixtures/*.csv
+# Curated datasets from free/public sources are committed (see datasets/README.md)
+!datasets/**/*.csv
 
 # Secrets
 .env

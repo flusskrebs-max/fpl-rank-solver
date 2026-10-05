@@ -25,6 +25,8 @@ The season is live, so phases 2 and 3 should start collecting data early even wh
 
 - Live API client tested on a machine that can reach the API; weekly snapshot routine
 - Sample managers near the target rank each GW → EO by tier, captaincy, chip usage
+  - Started: Elite 64 EO, captains and chips for 2026-27 GW1-5 in `datasets/elite_ownership/`,
+    loaded by `fplrank.data.elite` (B01)
 - Points-to-rank thresholds from past seasons (what total did rank X need at GW t?)
 - Projections ingestion for the chosen source(s)
 
