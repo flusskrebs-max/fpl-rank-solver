@@ -5,6 +5,10 @@ season = "2026-27"
 # Each N becomes a set (and EO group) named "top{N}".
 overall_top = [1000]
 
+# T_X(now): each run saves the standings page holding these overall ranks, so the points needed
+# for rank X are recorded every GW (data/collected/thresholds.parquet).
+threshold_ranks = [100, 1000, 10000]
+
 # Hand-maintained lists of team ids. The key becomes the set / EO group name.
 [named_lists]
 # elite64 = [123456, 234567]

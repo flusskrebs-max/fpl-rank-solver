@@ -29,6 +29,21 @@ Components: [A] scenario engine, [B] field engine, [C] candidate generator, [D] 
 Data collection that feeds them (Elite 64 datasets B01, top-1000 collector B03 scheduled twice weekly)
 runs alongside.
 
+**Data foundations** (feeding all steps):
+
+- Live API client tested on a machine that can reach the API; weekly snapshot routine
+- Sample managers near the target rank each GW → EO by tier, captaincy, chip usage
+  - Started: Elite 64 EO, captains and chips for 2026-27 GW1-5 in `datasets/elite_ownership/`,
+    loaded by `fplrank.data.elite` (B01)
+  - Started: top-1000 picks/chips/transfers/ranks collector with deadline EO,
+    `fplrank.collect.elite_picks`, scheduled twice weekly (B03)
+- Points-to-rank thresholds from past seasons (what total did rank X need at GW t?)
+  - Started: end-of-season cut-offs from the top 1000's past seasons (`docs/research/rank-cutoffs.md`:
+    top 10k/100k covered for 8 seasons, top 1k for 3, top 100 for none), plus T_X(now) for ranks
+    100/1k/10k saved every collector run (B03 item 5). Mid-season (GW t) thresholds still needed.
+- Projections ingestion for the chosen source(s)
+  - Started: Solio loader and vintage registry, `fplrank.data.projections` (B02)
+
 ### 1. Residual-based fill for unlisted EO ✅ (B01b)
 
 `fplrank.data.elite.eo_panel` spreads each group's residual EO over unlisted players by ownership,
