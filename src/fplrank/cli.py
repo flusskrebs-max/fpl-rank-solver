@@ -187,7 +187,9 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
             if team_id is None:
                 p.error("--target needs --points or his --team_id")
             points = (standing or ownership.current_standing)(int(team_id))[0]
-        table, gap_text = ownership.rank_goal_table(solutions, base.projections, eo, gw, ours.target, points, ownership.drift_group(group))
+        table, gap_text = ownership.rank_goal_table(
+            solutions, base.projections, eo, gw, ours.target, points, ownership.drift_group(group), hit_cost=hit_cost
+        )
         if ours.lam is not None:  # fixed λ: report it, not the best one
             table = pd.concat([table[table["lam"] == ours.lam], table[table["lam"] != ours.lam]], ignore_index=True)
         chosen = float(table.iloc[0]["lam"])

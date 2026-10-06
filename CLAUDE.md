@@ -58,17 +58,11 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
-  the B01 long shape. Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
-- `src/fplrank/model/ownership.py`: ownership dynamics v0. `forecast_eo(group, gw_next, state, model)`
-  = next-GW EO with an 80% band (XI share logistic transition + captain softmax; chips as input).
-  `fit_default()`, `backtest()`; results in `docs/research/ownership-dynamics-v0.md`.
+  the B01 long shape (deadline EO with chips; `opt.ownership.chip_free_eo` takes them out for `--eo`). Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
 - `src/fplrank/model/naive_field.py`: his solver on every AE64/E64 squad (EO idea 3); `model/eo_blend.py`: the EO blend
   (fair persistence, XI/captain re-pick, drift, banked solve, templates) and the critique checks; `docs/research/eo-blend.md`.
+- `src/fplrank/eval/spread.py`: V1, S2's predicted sd against real managers' realised spread (`docs/research/realised-spread.md`).
 - `notebooks/`: analysis as cell-marked `.py` files (`# %%`); open in VS Code or run with uv.
-- `src/fplrank/sim/scenarios.py`: scenario engine ([A]). `simulate(projections, fixtures, S, H, seed, rules=season)`
-  -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.
-  All tunable constants in `Params`. `sim/calibration.py`: tuned on 2023-24, tested on 2024-25, checked on
-  2025-26 against an empirical benchmark (`docs/research/scenario-calibration.md`).
 - `docs/tasks/TASKS.md` (the queue, grouped by release), `docs/tasks/log.md` (dated notes), `docs/tasks/briefs/`
   (open briefs); `docs/briefs/` (finished briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
 - `docs/weekly-run.md`: Alex's pre-deadline steps (update, Solio files, team via his bookmarklet, `fplrank solve`).
@@ -80,8 +74,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   `target_line(rank)` (indicative absolute line for the report); `uv run python -m fplrank.rank.target 10000`.
 - `src/fplrank/opt/rank_goal.py`: S2c. `plan_moments`, `choose_lambda` (P of reaching the target line per λ); `src/fplrank/model/variance.py`: S2b v(xP) table.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
-- `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (thinking; `data-sources.md` = which
-  data we use and why),
+- `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (findings; `README.md` = where things stand
+  and an index, `data-sources.md` = which data we use and why, `archive/` = superseded notes),
   `docs/decisions/` (ADRs: add one for any decision that would be expensive to reverse).
 
 ## Commands

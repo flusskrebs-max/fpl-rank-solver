@@ -43,3 +43,16 @@ def test_plan_moments_relative_to_field():
     assert m.mu == pytest.approx((2 - 1.5) * 6 + 1 * 4 - 0.5 * 2)
     assert m.var == pytest.approx(0.5**2 * 9 + 1 * 4 + 0.5**2 * 1)
     assert rg.plan_moments(sol, proj, eo, vtable, kappa=0.3).mu == pytest.approx(0.3 * m.mu)
+
+
+def test_plan_moments_read_long_position_codes_and_hit_cost():
+    """FPL Review's GKP/DEF/MID/FWD reach us before his parser shortens them; hits use the solve's hit cost."""
+    proj = pd.DataFrame({"ID": [1, 2, 3], "Pos": ["M", "M", "F"], "6_Pts": [6.0, 4.0, 2.0]})
+    picks = pd.DataFrame({"id": [1, 2], "week": [6, 6], "multiplier": [2, 1]})
+    vtable = pd.DataFrame({"pos": ["M", "M", "M", "F", "F", "F"], "band": [1, 2, 3, 1, 2, 3], "pts_var": [1.0, 4.0, 9.0, 1.0, 4.0, 9.0]})
+    eo = pd.Series({1: 1.5, 3: 0.5})
+    short = rg.plan_moments({"picks": picks, "statistics": {6: {"pt": 0}}}, proj, eo, vtable)
+    long = rg.plan_moments({"picks": picks, "statistics": {6: {"pt": 0}}}, proj.assign(Pos=["MID", "MID", "FWD"]), eo, vtable)
+    assert long == short and short.var > 0
+    hit = rg.plan_moments({"picks": picks, "statistics": {6: {"pt": 1}}}, proj, eo, vtable, hit_cost=6)
+    assert hit.mu == pytest.approx(short.mu - 6)

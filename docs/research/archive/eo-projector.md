@@ -1,5 +1,7 @@
 # EO projector: proposal (2026-10-06)
 
+> Archived 2026-10-06. The proposal behind the EO work: idea 1 failed (`eo-flow-v1.md`), idea 3 ran (`../eo-naive-field.md`), and the agreed blend ended in the XI and captain re-pick (`../eo-blend.md`). `model/ownership.py` and `--eo-forecast` named below have since been removed.
+
 Status: proposal. Idea 1 built and tested 2026-10-06: fails the pass criteria (`eo-flow-v1.md`). Idea 3 built and tested 2026-10-06 (`eo-naive-field.md`); approach agreed below. Scope: this project builds only the EO projection and the λ
 choice; Sertalp's solver runs unchanged. This note covers Alex's three ideas (thread "EO projector",
 2026-10-06) and which to try first.

@@ -20,12 +20,18 @@ Also: per-GW σ² of Δ (the empirical base for S2c) and the line's drift agains
 import numpy as np
 import pandas as pd
 
+from fplrank.data.fpl_api import latest_snapshot
 from fplrank.data.projections import latest, load_solio
 from fplrank.model import variance
-from fplrank.model.ownership import points_in
 from fplrank.paths import COLLECTED_DIR
 
 GROUPS = ("AE64", "E64", "top1000", "top10k")
+
+
+def points_in(gw: int) -> pd.Series:
+    """Actual FPL points scored in `gw`, from the saved event/{gw}/live/ snapshot."""
+    live = latest_snapshot(f"event/{gw}/live/")
+    return pd.Series({e["id"]: e["stats"]["total_points"] for e in live["elements"]}, name="pts")
 
 
 def _load(collected_dir=COLLECTED_DIR):

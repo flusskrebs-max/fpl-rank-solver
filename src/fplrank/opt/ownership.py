@@ -16,6 +16,7 @@ decided now, and EO further out is much less certain. Later GWs use raw xP. Each
 the raw projections (`score_plan`) and the λ chosen by P(reaching the target line) (`rank_goal_table`).
 """
 
+import math
 import re
 
 import pandas as pd
@@ -197,47 +198,26 @@ def score_plan(solution: dict, projections: pd.DataFrame, eo: pd.Series, hit_cos
     }
 
 
-def forecast_eo(group: str, next_gw: int, model=None, table: pd.DataFrame | None = None) -> pd.Series:
-    """S1c: the B04 one-step forecast of `group`'s EO at the `next_gw` deadline (`eo_mean`), fpl_id -> EO.
-
-    The collector's EO for a GW exists only after its deadline, so this is the EO we would see at it.
-    Chips are not forecast (none assumed). Needs the group's data for next_gw - 1 and a registered
-    Solio file for next_gw.
-    """
-    from fplrank.model import ownership as dyn
-
-    model = dyn.fit_default() if model is None else model
-    state = dyn.state_for(group, next_gw, table, chips_known=False)
-    fc = dyn.forecast_eo(group, next_gw, state, model)
-    return fc.set_index("fpl_id")["eo_mean"].astype(float)
-
-
 # ---------------------------------------------------------------------------------------------
 # used by `fplrank solve` (cli.py)
 
 
-def pick_eo(group: str, bootstrap: dict, next_gw: int, forecast: bool = False) -> tuple[pd.Series | pd.DataFrame, str]:
-    """EO for `group` (a collector group, or 'solio') and a one-line description of it.
-
-    forecast: B04's forecast of the group's EO at the `next_gw` deadline (S1c) instead of last GW's collected EO.
-    """
+def pick_eo(group: str, bootstrap: dict, next_gw: int) -> tuple[pd.Series | pd.DataFrame, str]:
+    """EO for `group` (a collector group, or 'solio') and a one-line description of it."""
     if group == "solio":
         eo = load_solio_eo(bootstrap)
         first = eo_for(eo, next_gw)
         players = int((first > 0).sum())
         return eo, f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {players} players, total {first.sum():.1f})"
-    if forecast:
-        eo = forecast_eo(group, next_gw)
-        return eo, f"{group} forecast for the GW{next_gw} deadline, repeated ({int((eo > 0.005).sum())} players, total {eo.sum():.1f})"
     eo, eo_gw = load_eo(group, next_gw - 1)
     return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
 
 
-def drift_group(eo_group: str, override: str | None = None) -> str:
-    """Collector group for the line's drift: `override`, else the EO group if it is a fixed list (or the
-    elite mix, measured against the same mix), else AE64."""
+def drift_group(eo_group: str) -> str:
+    """Collector group for the line's drift: the EO group if it is a fixed list (or the elite mix, measured
+    against the same mix), else AE64."""
     # top1000/top10k are today's top managers, so their drift is biased low (V1); default to a fixed list
-    return override or (eo_group if eo_group in ("AE64", "E64", "elite") else "AE64")
+    return eo_group if eo_group in ("AE64", "E64", "elite") else "AE64"
 
 
 def current_standing(team_id: int) -> tuple[int, int | None]:
@@ -248,8 +228,12 @@ def current_standing(team_id: int) -> tuple[int, int | None]:
     return last["total_points"], last.get("overall_rank")
 
 
-def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=0.3) -> tuple[pd.DataFrame, str]:
-    """S2c: P(finishing at or above the top-`target_rank` line) per λ, best first, and a line describing the gap."""
+def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=0.3, hit_cost=4) -> tuple[pd.DataFrame, str]:
+    """S2c: P(finishing at or above the top-`target_rank` line) per λ, best first, and a line describing the gap.
+
+    `points` are ours after GW next_gw - 1. If the collected line is older than that, it is moved on by its
+    pace for the missing GWs, so both sides of the gap are after the same GW.
+    """
     from fplrank.model import variance
     from fplrank.opt import rank_goal
     from fplrank.rank import target
@@ -257,15 +241,19 @@ def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, gr
     line = target.target_line(target_rank)
     drift, _ = target.line_drift(target_rank, group)
     gws_left = 38 - next_gw + 1
-    gap = line.now - points + drift * gws_left
+    stale = max(next_gw - 1 - line.gw, 0)
+    now = line.now + stale * line.pace
+    gap = now - points + drift * gws_left
+    sd_line = 0.0 if math.isnan(line.sd) else line.sd  # one season of cut-offs: no spread to add
     vtable = variance.build()
     plans = {
-        lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=kappa), "ev": sol["ev"]}
+        lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=kappa, hit_cost=hit_cost), "ev": sol["ev"]}
         for lam, sol in solutions.items()
     }
-    table = rank_goal.choose_lambda(gap, gws_left, plans, sd_line=line.sd)
+    table = rank_goal.choose_lambda(gap, gws_left, plans, sd_line=sd_line)
+    moved = f" (GW{line.gw} line moved on {stale} GW at {line.pace:.0f} a GW)" if stale else ""
     text = (
-        f"Top {target_rank:,} line {line.now:.0f} after GW{line.gw}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
+        f"Top {target_rank:,} line {now:.0f} after GW{line.gw + stale}{moved}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
         f" gap to close {gap:.0f} over {gws_left} GWs (κ = {kappa:g}, s = 1)"
     )
     return table, text

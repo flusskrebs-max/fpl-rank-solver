@@ -1,10 +1,10 @@
 # EO naive field (idea 3): result (2026-10-06)
 
-Idea 3 from `eo-projector.md`: forecast a group's next-GW ownership and EO by running Sertalp's solver
+Idea 3 from `archive/eo-projector.md`: forecast a group's next-GW ownership and EO by running Sertalp's solver
 at λ = 0 (pure EV) on every member's real squad, then compare it with Alex's cheaper blend (current EO,
 an EV-driven drift and a few template wildcard solves). Code: `src/fplrank/model/naive_field.py`, tests
 in `tests/test_naive_field.py` (synthetic data only). Pass criteria are the ones fixed in
-`eo-projector.md` before idea 1 was run.
+`archive/eo-projector.md` before idea 1 was run.
 
 **Verdict, in short**
 
@@ -18,7 +18,7 @@ in `tests/test_naive_field.py` (synthetic data only). Pass criteria are the ones
 - The cheap blend is about as good as persistence on EO (AE64 10.7-11.9 vs 12.1; E64 8.4-9.3 vs 8.7).
   It is only a little closer to the per-manager forecast than persistence is (EO 8-12 points apart, vs
   11-14 for persistence). Its biggest gap is that it keeps last week's XI and captaincy. Re-picking
-  those, as the per-manager solves do, is the next step (see "Agreed approach" in `eo-projector.md`).
+  those, as the per-manager solves do, is the next step (see "Agreed approach" in `archive/eo-projector.md`).
 - Chips were heavy (GW3: 60 of 64 AE64 managers played one). Only the wildcard is modelled. Split by
   chip use, the EO gain holds for managers who played no chip (AE64 7.4 vs 14.1 points, E64 9.8 vs
   13.3), but their ownership error is slightly worse than persistence: see "Chips" below.
@@ -166,9 +166,9 @@ All in percentage points (EO ×100, ownership ×100), per group and transition (
   predicted risers (for rises) or fallers (for falls).
 - **Gap to the per-manager run**: mean absolute EO difference between a forecast and the `mix` (or
   `banked`) forecast, over players owned at t or in either.
-- **Quiet weeks** (defined before eo-flow-v1 ran): wildcards plus free hits under 10% of the group and
+- **Quiet weeks** (defined before `archive/eo-flow-v1.md` ran): wildcards plus free hits under 10% of the group and
   no 20-point move. Only GW2 qualifies.
-- **Pass criteria** (eo-projector.md): ≥15% lower EO error than persistence over the scored weeks, no
+- **Pass criteria** (archive/eo-projector.md): ≥15% lower EO error than persistence over the scored weeks, no
   worse in quiet weeks, surge recall ≥50%. Alex has since said the blend doesn't need to pass these;
   it only has to approximate the per-manager run, so the blend is reported as numbers.
 
@@ -304,7 +304,7 @@ of 124 squads on 6 workers, or 2-3 hours for a four-week backtest like this one.
 - **Four transitions, three on a stale file.** GW3-5 used projections from 22 August. GW3 was a
   wildcard week (61% of AE64), so it dominates the means. Treat all of this as a first look.
 - **EO gain is mostly lineup and captaincy, not transfers.** A fairer baseline would hold ownership and
-  re-pick XI and captain (eo-flow-v1's "captain only" baseline gained 1-5% over persistence on
+  re-pick XI and captain (`archive/eo-flow-v1.md`'s "captain only" baseline gained 1-5% over persistence on
   2025-26). We didn't build that here.
 - **Chip weeks**: only the wildcard is modelled. The solver never free-hits, triple-captains or
   bench-boosts, so it can't match GW4's 65 triple captains; persistence carries last week's chips
@@ -332,7 +332,7 @@ Outputs (git-ignored): `data/derived/naive_field/backtest_solves.parquet`, `back
 
 ## Next
 
-The agreed approach (`eo-projector.md`) takes this forward: ~20 clustered representatives with short
+The agreed approach (`archive/eo-projector.md`) takes this forward: ~20 clustered representatives with short
 H3 solves (which re-pick XI and captain) blended with persistence for next-GW EO, a few H8 wildcard
 templates for the longer horizon, and the full per-manager run occasionally as the yardstick. The GW6
 forecast with the fresh `GW06_20261005.csv` can be run now and scored after Saturday's deadline; it

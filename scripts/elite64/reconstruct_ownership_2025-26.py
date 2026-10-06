@@ -3,7 +3,7 @@
 #   eo.csv / meta.csv / picks.csv / players_map.csv = datasets/elite_ownership/elite64_{eo,meta,picks,players_map}_2025-26.csv
 #   ref/players_raw.csv, ref/merged_gw.csv = vaastav 2025-26 files: github.com/vaastav/Fantasy-Premier-League,
 #     data/2025-26/ (fplrank.data.historical downloads them to data/raw/vaastav/2025-26/, gws/merged_gw.csv)
-# Maintained port: scripts/reconstruct_elite_ownership.py. Output committed as datasets/elite_ownership/elite64_ownership_2025-26.csv.
+# (The maintained port, scripts/reconstruct_elite_ownership.py, was removed in the 2026-10-06 clean-up; git history has it.) Output committed as datasets/elite_ownership/elite64_ownership_2025-26.csv.
 """Squad ownership by GW for AE64/E64, 2025-26.
 Forward pass: GW1 picks + complete transfer lists. Unknown WC squads: GW6 from the WC pick table;
 other WC weeks start from 'WC managers mirror the group', then are corrected so that ownership never

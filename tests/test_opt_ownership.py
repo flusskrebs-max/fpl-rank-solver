@@ -119,7 +119,7 @@ def test_solio_eo_matches_names_and_varies_by_gw(tmp_path):
     assert adj.loc[0, "8_Pts"] == adj.loc[0, "7_Pts"]  # beyond the forecast: last GW reused
 
 
-# --- S1c: λ on the next GW only, and the deadline EO forecast -----------------------------------
+# --- S1c: λ on the next GW only ------------------------------------------------------------------
 
 
 def test_lam_gw_scales_only_that_gw():
@@ -128,21 +128,6 @@ def test_lam_gw_scales_only_that_gw():
     assert list(adj["6_Pts"]) == pytest.approx([6.0, 4.0 * 1.12, 2.0 * 0.8])
     assert list(adj["7_Pts"]) == list(proj["7_Pts"])
     pd.testing.assert_frame_equal(ow.adjust_projections(proj, eo, 0.2, lam_gw=None), ow.adjust_projections(proj, eo, 0.2))
-
-
-def test_forecast_eo_returns_eo_mean_by_player(monkeypatch):
-    from fplrank.model import ownership as dyn
-
-    table = pd.DataFrame(
-        {"gw": [5, 5], "fpl_id": [1, 2], "xi": [0.9, 0.1], "bench": 0.0, "cap": [0.5, 0.0], "tc_cap": 0.0, "eo": [1.4, 0.1], "n": 1000}
-    )
-    monkeypatch.setattr(dyn, "projections_for", lambda gw, horizon=1: pd.Series({1: 6.0, 2: 3.0, 3: 2.0}))
-    monkeypatch.setattr(dyn, "points_in", lambda gw: pd.Series({1: 8, 2: 2}))
-    model = dyn.OwnershipModel(tau={"top1000": 1.0})
-    eo = ow.forecast_eo("top1000", 6, model=model, table=table)
-    assert set(eo.index) == {1, 2, 3}
-    assert eo.sum() == pytest.approx(12.0)  # 11 starters plus one captain, no chips
-    assert eo[1] > eo[2] > 0
 
 
 def _picks():
@@ -181,3 +166,20 @@ def test_elite_is_the_mix_of_ae64_and_e64(tmp_path, monkeypatch):
     assert ow.group_weights("elite", 0.4) == pytest.approx({"AE64": 0.3, "E64": 0.3, "top10k": 0.4})
     assert ow.group_weights("elite") == {"AE64": 0.5, "E64": 0.5}  # the live blend is off by default
     assert ow.drift_group("elite") == "elite"
+
+
+def test_rank_goal_table_moves_a_stale_line_on_by_its_pace(monkeypatch):
+    """Our points are after GW5; a line last collected after GW3 is moved on two GWs at its pace."""
+    from fplrank.model import variance
+    from fplrank.opt import rank_goal
+    from fplrank.rank import target
+
+    monkeypatch.setattr(target, "target_line", lambda rank: target.TargetLine(rank, 3, 200, 60, 200 + 35 * 60, float("nan"), ("x",)))
+    monkeypatch.setattr(target, "line_drift", lambda rank, group: (0.0, None))
+    monkeypatch.setattr(variance, "build", lambda: None)
+    monkeypatch.setattr(rank_goal, "plan_moments", lambda *a, **k: rank_goal.Moments(0.0, 100.0, 1))
+    solutions = {0.0: {"ev": 50.0}, 0.1: {"ev": 49.0}}
+    table, text = ow.rank_goal_table(solutions, None, None, 6, 10000, 300, "AE64")
+    assert "line 320 after GW5 (GW3 line moved on 2 GW at 60 a GW)" in text
+    assert "gap to close 20" in text
+    assert table["p"].notna().all()  # one season of cut-offs (sd NaN) still gives a probability

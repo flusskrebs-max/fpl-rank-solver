@@ -10,11 +10,10 @@ From now on Claude Code does both (see "How we work" in `CLAUDE.md`). This note 
   today's points gap to the rank-X line, not historical per-GW rank curves (solver-design §4).
 - Account for our chips and the target group's remaining chips; forecast the target group's EO,
   including captaincy-driven pile-ins; always report the EV given up for any risk taken.
-- Architecture (solver-design §4): [A] correlated points simulator → [B] field/EO model → [C] MILP
-  candidate plans across ownership weights (the community "risk position" knob) → [D] simulate each
-  candidate's relative score Δ = Σ (our multiplier − EO) × points − hits → value function
-  V(gap, GWs left, chips) → [E] pick the best, with its EV cost. HiGHS has no MIQP, so risk is handled by
-  simulation, not inside the MILP.
+- Architecture as built (2026-10-06): Sertalp's solver does the team, projections, MILP and simulations;
+  we supply the field's EO and choose λ, the weight in xP × (1 + λ(EO − 1)), by P(reaching the target line)
+  from a normal approximation of our relative score. The original plan (solver-design §4: our own points
+  simulator, rollout and a value function) is parked. HiGHS has no MIQP, so risk stays outside the MILP.
 - Historical first: build from what we've assembled (2025-26 Elite 64 season, vaastav seasons,
   collector data) rather than waiting a season.
 

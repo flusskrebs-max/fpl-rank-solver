@@ -3,7 +3,7 @@
 #   eo.csv / meta.csv / picks.csv / players_map.csv = datasets/elite_ownership/elite64_{eo,meta,picks,players_map}_2025-26.csv
 #   ref/players_raw.csv, ref/merged_gw.csv = vaastav 2025-26 files: github.com/vaastav/Fantasy-Premier-League,
 #     data/2025-26/ (fplrank.data.historical downloads them to data/raw/vaastav/2025-26/, gws/merged_gw.csv)
-# Maintained port: scripts/elite_flows.py. Its outputs are committed as datasets/elite_ownership/elite64_{weekly_summary,flows_player_gw}_2025-26.csv.
+# (The maintained port, scripts/elite_flows.py, was removed in the 2026-10-06 clean-up; git history has it.) Its outputs are committed as datasets/elite_ownership/elite64_{weekly_summary,flows_player_gw}_2025-26.csv.
 import pandas as pd, numpy as np, json
 R=lambda f: pd.read_csv(f,keep_default_na=False)
 eo=R('eo.csv'); me=R('meta.csv'); pk=R('picks.csv'); pm=R('players_map.csv')
