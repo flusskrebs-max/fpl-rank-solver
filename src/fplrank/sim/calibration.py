@@ -333,7 +333,7 @@ def evaluate(season: str, params: Params = DEFAULT_PARAMS, emp: Empirical | None
     return out
 
 
-def write_report(path=REPORT_PATH, params: Params = DEFAULT_PARAMS, S: int = 2000) -> str:  # noqa: N803
+def write_report(path=REPORT_PATH, params: Params = DEFAULT_PARAMS, S: int = 1000) -> str:  # noqa: N803
     pg_train, _ = season_inputs(TRAIN)
     emp = fit_empirical(pg_train, gws_with_xp(pg_train))
     runs = [evaluate(s, params, emp, S) for s in (TRAIN, TEST, CHECK)]

@@ -87,7 +87,7 @@ class Params:
     max_goal_share: float = 0.6  # of his team's goals (brief: top players take 50-60% of involvements)
     max_assist_share: float = 0.5
     keeper_max_assist_share: float = 0.01  # keepers assist ~0.3% of games (2023-24): not a lever for their projection
-    shared_weight: float = 0.7  # tuned on 2023-24
+    shared_weight: float = 0.85  # tuned on 2023-24: 0.7 gave attacker correlation 0.055, 1.0 gave 0.123, actual 0.099
     bps_noise: float = 6.0  # sd of the BPS-like score's noise; tuned on 2023-24
     fitted: dict = field(default_factory=dict, compare=False)  # notes from the latest tuning run
 
