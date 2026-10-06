@@ -196,7 +196,10 @@ def _main(argv=None):
     p.add_argument("--eo", default="AE64", help="EO group: AE64, E64 or top1000")
     p.add_argument("--lam", type=float, nargs="+", help="one or more λ values")
     p.add_argument("--sweep", action="store_true", help=f"λ in {SWEEP}")
-    p.add_argument("--projections", help="Solio CSV (default: newest registered for the next GW)")
+    p.add_argument(
+        "--projections",
+        help="Solio CSV, or 'ep_next' for FPL's free projections (default: newest Solio file registered for the next GW, else ep_next)",
+    )
     p.add_argument("--horizon", type=int, default=5)
     p.add_argument("--secs", type=int, default=600, help="time limit per solve (upstream default; solves usually finish in seconds)")
     args = p.parse_args(argv)
@@ -204,8 +207,17 @@ def _main(argv=None):
 
     my_data, bootstrap, fixtures = _live_inputs(args.team)
     next_gw = next(e["id"] for e in bootstrap["events"] if e["is_next"])
-    path = args.projections or proj_store.latest(next_gw)
-    projections = pd.read_csv(path, encoding="utf-8-sig")
+    path = args.projections
+    if path is None:
+        try:
+            path = proj_store.latest(next_gw)
+        except LookupError:
+            print("No Solio file registered for this GW: using FPL's ep_next (crude, one GW repeated per fixture)")
+            path = "ep_next"
+    if str(path) == "ep_next":
+        projections = proj_store.from_ep_next(bootstrap, fixtures, args.horizon)
+    else:
+        projections = pd.read_csv(path, encoding="utf-8-sig")
     eo, eo_gw = load_eo(args.eo, next_gw - 1)
     print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {args.eo} GW{eo_gw} ({len(eo)} players, total {eo.sum():.1f})")
 

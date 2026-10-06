@@ -60,6 +60,47 @@ def load_solio(path) -> pd.DataFrame:
     return long[LONG_COLS].sort_values(["gw", "fpl_id"], ignore_index=True)
 
 
+def from_ep_next(bootstrap: dict, fixtures: list[dict], horizon: int) -> pd.DataFrame:
+    """Free fallback projections in the upstream/Solio wide format, from FPL's own `ep_next`.
+
+    Crude on purpose (S1b): `ep_next` is FPL's one-GW expectation for the next GW (it tracks vaastav `xP`
+    closely; docs/research/data-sources.md). Later GWs repeat it per fixture (0 for a blank, x2 for a
+    double), so it knows nothing about fixture difficulty, rotation or injuries beyond the next GW. xMins
+    = 90 x the player's share of possible minutes so far x chance of playing (if given), per fixture.
+    """
+    next_gw = next(e["id"] for e in bootstrap["events"] if e["is_next"])
+    gws = [gw for gw in range(next_gw, next_gw + horizon) if gw <= 38]
+    played = sum(1 for e in bootstrap["events"] if e["id"] < next_gw)
+    n_fix = pd.DataFrame(
+        [(f["event"], t) for f in fixtures if f["event"] in gws for t in (f["team_h"], f["team_a"])], columns=["gw", "team"]
+    )
+    n_fix = n_fix.value_counts().to_dict()
+    teams = {t["id"]: t["name"] for t in bootstrap["teams"]}
+    rows = []
+    for e in bootstrap["elements"]:
+        ep = float(e["ep_next"] or 0)
+        n_next = n_fix.get((next_gw, e["team"]), 0)
+        per_fixture = ep / n_next if n_next else ep
+        share = min(1.0, e["minutes"] / (90 * played)) if played else 1.0
+        chance = e["chance_of_playing_next_round"]
+        xmins = 90 * share * (1.0 if chance is None else chance / 100)
+        price = e["now_cost"] / 10
+        row = {
+            "Pos": POS_BY_ELEMENT_TYPE[e["element_type"]],
+            "ID": e["id"],
+            "Name": e["web_name"],
+            "BV": price,
+            "SV": price,
+            "Team": teams[e["team"]],
+        }
+        for gw in gws:
+            row[f"{gw}_xMins"] = round(xmins * n_fix.get((gw, e["team"]), 0), 2)
+        for gw in gws:
+            row[f"{gw}_Pts"] = round(per_fixture * n_fix.get((gw, e["team"]), 0), 2)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def read_registry(projections_dir: Path | None = None) -> pd.DataFrame:
     projections_dir = projections_dir or PROJECTIONS_DIR
     path = projections_dir / "registry.csv"

@@ -55,3 +55,9 @@ One line per finished task or decision from now on; detail belongs in the PR and
   line now + GWs left x past seasons' pace; after GW5 top 10k 398 now, ~2589 ± 95 at GW38.
 - 2026-10-06: ADR 0004 (accepted by Alex): keep S1's xP adjustment, equivalent to the community "risk" term `w·EO·xP`
   plus a (1 − λ) rescaling; no vendor changes. New S1d (`--eo solio`) blocked on a Solio export with EO; S1c on hold.
+- 2026-10-06: PRs #15-17 merged (plan v2, C0, S2a).
+- 2026-10-06, C1: collector `[sampled]` sets; `top10k` = every 10th of ranks 1-10,000. First run started on Alex's PC.
+- 2026-10-06, S1b: `projections.from_ep_next(bootstrap, fixtures, horizon)` and S1 `--projections ep_next` (also the
+  automatic fallback when no Solio file is registered); offline test on a saved real GW6 team (`tests/fixtures/gw6_live/`)
+  checks λ = 0 equals `solve_ev`. Finding: `ep_next` is FPL's form-based estimate, not a projection (Groß 15.5 for GW6,
+  so the plan captains him); fine for tests and history, not for real decisions.

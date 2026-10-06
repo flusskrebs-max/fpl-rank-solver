@@ -1,0 +1,122 @@
+{
+ "chips": [
+  {
+   "name": "bboost",
+   "time": "2026-08-21T13:34:42.958037Z",
+   "event": 1
+  },
+  {
+   "name": "3xc",
+   "time": "2026-09-04T16:56:34.776513Z",
+   "event": 3
+  },
+  {
+   "name": "wildcard",
+   "time": "2026-09-05T07:56:41.792462Z",
+   "event": 4
+  },
+  {
+   "name": "freehit",
+   "time": "2026-09-18T17:13:34.356595Z",
+   "event": 5
+  }
+ ],
+ "picks": [
+  {
+   "element": 464,
+   "purchase_price": 61,
+   "selling_price": 61,
+   "element_type": 4
+  },
+  {
+   "element": 115,
+   "purchase_price": 47,
+   "selling_price": 48,
+   "element_type": 2
+  },
+  {
+   "element": 58,
+   "purchase_price": 40,
+   "selling_price": 40,
+   "element_type": 1
+  },
+  {
+   "element": 31,
+   "purchase_price": 44,
+   "selling_price": 45,
+   "element_type": 2
+  },
+  {
+   "element": 449,
+   "purchase_price": 51,
+   "selling_price": 52,
+   "element_type": 2
+  },
+  {
+   "element": 1,
+   "purchase_price": 60,
+   "selling_price": 60,
+   "element_type": 1
+  },
+  {
+   "element": 304,
+   "purchase_price": 40,
+   "selling_price": 40,
+   "element_type": 2
+  },
+  {
+   "element": 94,
+   "purchase_price": 60,
+   "selling_price": 61,
+   "element_type": 3
+  },
+  {
+   "element": 154,
+   "purchase_price": 97,
+   "selling_price": 97,
+   "element_type": 3
+  },
+  {
+   "element": 290,
+   "purchase_price": 45,
+   "selling_price": 45,
+   "element_type": 3
+  },
+  {
+   "element": 368,
+   "purchase_price": 70,
+   "selling_price": 69,
+   "element_type": 3
+  },
+  {
+   "element": 165,
+   "purchase_price": 77,
+   "selling_price": 77,
+   "element_type": 4
+  },
+  {
+   "element": 411,
+   "purchase_price": 155,
+   "selling_price": 155,
+   "element_type": 4
+  },
+  {
+   "element": 4,
+   "purchase_price": 80,
+   "selling_price": 80,
+   "element_type": 2
+  },
+  {
+   "element": 40,
+   "purchase_price": 76,
+   "selling_price": 76,
+   "element_type": 3
+  }
+ ],
+ "team_id": 895045,
+ "transfers": {
+  "bank": 1,
+  "limit": 1,
+  "made": 0
+ }
+}

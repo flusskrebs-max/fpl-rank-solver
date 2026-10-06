@@ -3,6 +3,14 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-06: FPL `ep_next` is a form measure, not a projection
+
+- For GW6 (bootstrap before the deadline) the highest `ep_next` values are Groß 15.5, Schade 12.0, Bogle
+  10.0, Kostoulas 10.0: recent points per game, not expected points. So a solve on `ep_next` captains Groß.
+  vaastav `xP` is FPL's `ep_this`, the same measure, which is why the two correlate so well.
+- Consequence: `ep_next` is fine as S1's offline/test fallback and as a like-for-like xP for past seasons
+  (S2b, B04b, banded by quantile), but not as a projection for real decisions. Use Solio for those.
+
 ## 2026-10-06: Data sources review
 
 - vaastav has stopped weekly updates; its 2025-26 `xP` is filled only for GWs 1-6, 8, 9, 24, 29 and 38.
