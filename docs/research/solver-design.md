@@ -106,10 +106,10 @@ Say you own player P at 15% elite EO, he hauls, and next week elite EO jumps to 
   calibrate that spread term, and we can get it another way: sample managers' `entry/{id}/history`
   (current-season rank by GW) from B03 as this season goes, and use end-of-season totals from the
   `past` field for previous seasons.
-- **Reference thresholds** (end of season, approximate): 2023/24 top 100 ≈ 2550, top 1k ≈ 2450,
-  top 10k ≈ 2380 (winner 2799); 2024/25 winner 2810; 2025/26 winner 2582 with 13.1m players, a
-  low-scoring season, so its thresholds will sit well below 2023/24's. Exact 2025/26 cut-offs to be
-  filled from B03's `past` sample.
+- **Reference thresholds** (end of season, from B03b's `past` sample of today's top 1000): 2025-26
+  top 1k ≈ 2448, top 10k ≈ 2399, top 100k ≈ 2326 (winner 2582); 2024-25 top 1k ≈ 2656,
+  top 10k ≈ 2600; 2023-24 top 10k ≈ 2573. Top 100 isn't covered by the sample yet. 2025-26 was a
+  low-scoring season, about 200 points below the two before it.
 
 Why not one big stochastic MILP? HiGHS has no mixed-integer quadratic, and the spike showed big-M
 probability models are slow even when tiny. Generate-then-simulate keeps the MILP linear, makes each
