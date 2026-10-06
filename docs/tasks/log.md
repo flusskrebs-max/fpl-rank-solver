@@ -64,3 +64,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, S1d: `--eo solio` reads Solio's per-GW EO forecast (matched to FPL ids by name + team) and S1 now takes
   a different EO per GW. Live GW6 sweep on the rank-1 team: EV plan for λ -0.1..0.1, Haaland captain for λ ≥ 0.2 (cost 3.4).
 - 2026-10-06, W1: `docs/weekly-run.md`, the pre-deadline steps on Alex's PC.
+- 2026-10-06, collector fix (with C1): FPL's picks endpoint shows the team after automatic subs once a GW is played, so
+  EO was post-sub (João Pedro GW5 AE64 0% instead of 6%). `deadline_picks` swaps auto-subs back; EO tables rebuilt.
+  LiveFPL `/EO` (all players, top 10k + overall, current GW) is the manual cross-check; no history or per-manager data.
