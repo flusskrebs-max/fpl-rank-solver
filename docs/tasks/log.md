@@ -87,3 +87,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   the λ = 0 solve isn't reaching the optimum; not yet looked at.
 - 2026-10-06, CLI 1/4: `solve_ev` now runs every solve through Sertalp's `solve_regular` (as simulations.py does): λ-adjusted
   projections go in as his `data/fplrank.csv`, his settings files apply, his solutions come back. Our own prep/solve calls removed.
+- 2026-10-06, EO idea 1: `model/eo_flow.py` refits v0 per group on 2025-26 with ΔEV (ep_next) and the price-band gap.
+  Fails the pre-set criteria for both groups (EO error -2% AE64 / +4% E64 vs persistence, surge recall 39%);
+  only v0's captain part helps. Write-up: `docs/research/eo-flow-v1.md`. Next: idea 3 on 2026-27.
