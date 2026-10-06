@@ -261,10 +261,7 @@ def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPS
             ranks.append({"entry_id": entry, "gw": h["event"], **{k: v for k, v in h.items() if k != "event"}})
             gw_picks = _latest(f"entry/{entry}/event/{h['event']}/picks/", snapshot_dir)
             if gw_picks is not None:
-                chip = gw_picks["active_chip"]
-                picks += [
-                    {"entry_id": entry, "gw": h["event"], "fpl_id": p["element"], **p, "active_chip": chip} for p in gw_picks["picks"]
-                ]
+                picks += deadline_picks(entry, h["event"], gw_picks)
         chips += [{"entry_id": entry, "gw": c["event"], "chip": c["name"], "time": c["time"]} for c in history["chips"]]
         transfers += [{"entry_id": entry, "gw": t["event"], **t} for t in _latest(f"entry/{entry}/transfers/", snapshot_dir) or []]
 
@@ -289,8 +286,32 @@ def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPS
     return tables
 
 
+def deadline_picks(entry: int, gw: int, payload: dict) -> list[dict]:
+    """Picks rows with `position` as set at the deadline.
+
+    Once a GW has been played, FPL's picks endpoint shows the team after automatic substitutions (a
+    benched sub moved into the XI and the non-player out). Swapping each `automatic_subs` pair back gives
+    the deadline XI, which is what EO means; `auto_sub` marks the swapped players. `multiplier` stays as
+    FPL reports it (after subs). Example: João Pedro, injured in GW5, was in 30 AE64 squads but no XI
+    after subs; at the deadline he was in 4.
+    """
+    rows = {
+        p["element"]: {"entry_id": entry, "gw": gw, "fpl_id": p["element"], **p, "active_chip": payload["active_chip"], "auto_sub": False}
+        for p in payload["picks"]
+    }
+    for sub in payload.get("automatic_subs", []):
+        a, b = rows.get(sub["element_in"]), rows.get(sub["element_out"])
+        if a and b:
+            a["position"], b["position"] = b["position"], a["position"]
+            a["auto_sub"] = b["auto_sub"] = True
+    return list(rows.values())
+
+
 def compute_eo(picks: pd.DataFrame, members: pd.DataFrame, season: str) -> pd.DataFrame:
-    """Deadline EO per set and GW: `season, gw, group, fpl_id, eo, n_managers` (eo 1.0 = 100%)."""
+    """Deadline EO per set and GW: `season, gw, group, fpl_id, eo, n_managers` (eo 1.0 = 100%).
+
+    Needs `position` as set at the deadline (`deadline_picks`); the captain flag is the deadline one too.
+    """
     columns = ["season", "gw", "group", "fpl_id", "eo", "n_managers"]
     if picks.empty:
         return pd.DataFrame(columns=columns)

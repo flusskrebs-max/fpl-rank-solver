@@ -191,3 +191,12 @@ def test_sampled_set_takes_every_kth_rank(tmp_path):
     assert members["entry_id"].tolist() == [101, 103] and set(members["set"]) == {"top3s"}  # rank_sort 1 and 3
     sample = elite_picks.load_config()["sampled"]["top10k"]
     assert sample == {"ranks": 10_000, "every": 10}
+
+
+def test_deadline_picks_undo_automatic_subs():
+    payload = _picks(captain=1)
+    payload["picks"][10]["position"], payload["picks"][11]["position"] = 12, 11  # FPL view after the GW: 12 came on for 11
+    payload["automatic_subs"] = [{"entry": 101, "element_in": 12, "element_out": 11, "event": 5}]
+    rows = {r["fpl_id"]: r for r in elite_picks.deadline_picks(101, 5, payload)}
+    assert rows[11]["position"] == 11 and rows[12]["position"] == 12
+    assert rows[11]["auto_sub"] and rows[12]["auto_sub"] and not rows[1]["auto_sub"]
