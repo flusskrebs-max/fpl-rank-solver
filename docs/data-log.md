@@ -10,9 +10,9 @@ Claude Code (PM + developer) since 2026-10-06; earlier entries were written by t
   on web name (accents ignored) + team; prices agree. GW6 total 1203% (≈ 12 per manager), 128 players > 0.
 - Against our GW5 EO (all players): correlation 0.89 with top1000 and E64, 0.77 with AE64, 0.90 with
   overall `selected_by_percent`; mean absolute gap over Solio's top 40: top1000 12, E64 15, AE64 20 points.
-  Biggest differences: João Pedro 69% (elite groups ~0, overall ownership 65%), Palmer 47% (AE64 89%),
-  Szoboszlai 34% (AE64 81%), Wissa 23% (AE64 70%). So Solio's EO looks like a broad field, not an elite
-  group; which tier it models is to be confirmed with Alex.
+  (These comparisons used EO built after automatic subs, since fixed; João Pedro's "0%" in the elite
+  groups was that bug.) Alex: Solio's EO is overall ownership. It is a forecast for the broad field,
+  e.g. João Pedro 69% for GW6 = the ~61% still holding him plus those who had him in their XI.
 - It is a multi-GW forecast, so S1 can use a different EO per GW (`--eo solio`, S1d).
 
 ## 2026-10-06: FPL `ep_next` is a form measure, not a projection
