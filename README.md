@@ -37,7 +37,8 @@ src/fplrank/
   model/             elite EO dynamics (ownership.py)
   sim/               correlated scenario engine and its calibration (parked)
   opt/               ownership-weighted solver (ownership.py); toy.py is a spike
-  rank/, eval/       placeholders (empty)
+  rank/              target line and its drift against the EO group (S2a)
+  eval/              placeholder (empty)
 vendor/open-fpl-solver/   unmodified upstream copy, pinned (see vendor/README.md)
 scripts/             smoke test, upstream updater
 tests/               pytest
