@@ -93,7 +93,8 @@ Say you own player P at 15% elite EO, he hauls, and next week elite EO jumps to 
   As built in S1 (`opt/ownership.py`, 2026-10-06): xP' = xP·(1 + λ·(EO − 1)), a linear proxy for the
   variance of the relative score. Centring at EO = 1 is a scale choice (adjusted xP stays near raw xP,
   so λ mostly changes which players are picked, not the value of hits), not a neutral point: for
-  variance, owning once is neutral at EO 0.5 and captaining at EO 1.5.
+  variance, owning once is neutral at EO 0.5 and captaining at EO 1.5. Equivalent to the community
+  `w·EO·xP` term plus a (1 − λ) rescaling of xP; the small differences are listed in ADR 0004.
 - **[D] Evaluator:** for each candidate, simulate its first-week action and then a default policy for
   the rest of the horizon (re-solve with λ chosen by the value function: a "rollout"). At the end of
   the horizon, convert the gap to a probability with V.
