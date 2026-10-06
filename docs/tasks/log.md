@@ -85,3 +85,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, S1 CLI: ran S1c live on Alex's PC (team 157924, GW6), fine; Alex's failure was the literal `<id>` in PowerShell.
   Added a progress line per λ (about 30-40s each, so a full sweep is ~5 min). Odd: λ = -0.2 beat λ = 0 on 5-GW EV (-0.91), so
   the λ = 0 solve isn't reaching the optimum; not yet looked at.
+- 2026-10-06, CLI 1/4: `solve_ev` now runs every solve through Sertalp's `solve_regular` (as simulations.py does): λ-adjusted
+  projections go in as his `data/fplrank.csv`, his settings files apply, his solutions come back. Our own prep/solve calls removed.
