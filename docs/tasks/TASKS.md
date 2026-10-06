@@ -16,7 +16,7 @@ Plan agreed with Alex at the 2026-10-06 stock take: three core products, simple 
 |---|---|---|---|
 | 1 | Tidy-up: merge PRs #10-#11, move the handover, briefs and this queue into the repo, retire the inbox | (none) | DONE (PR #12) |
 | 2 | Points simulator: out-of-sample calibration vs an empirical benchmark | B07b | DONE (PR #11; criteria not met, see note) |
-| 4 | **Ownership-weighted solver**: EV solve with xP adjusted by λ x EO; λ sweep with EV cost | S1 | IN REVIEW (branch claude/project-thread-snutkk) |
+| 4 | **Ownership-weighted solver**: EV solve with xP adjusted by λ x EO; λ sweep with EV cost | S1 | IN REVIEW (PR #14) |
 | 5 | **λ from the rank goal**: normal approximation of the relative score; choose λ from gap, target rank, GWs left | S2 | TODO |
 | 3 | **Elite EO forecast**: refit on 2025-26 and forecast several GWs ahead | B04b | TODO |
 
