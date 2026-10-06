@@ -147,6 +147,7 @@ def test_load_config(tmp_path):
         "overall_top": [1000, 10000],
         "named_lists": {"elite": [1, 2]},
         "leagues": {},
+        "sampled": {},
         "threshold_ranks": [],
     }
     assert elite_picks.load_config()["season"] == "2026-27"  # the committed config parses
@@ -180,3 +181,22 @@ def test_rank_100k_line_comes_from_page_2000(tmp_path):
     t = elite_picks.build_thresholds([100_000], snapshot_dir=tmp_path)
     assert len(t) == 1 and (t["target_rank"][0], t["rank"][0], t["total_points"][0]) == (100_000, 99_999, 251)
     assert 100_000 in elite_picks.load_config()["threshold_ranks"]
+
+
+def test_sampled_set_takes_every_kth_rank(tmp_path):
+    api = FakeApi(tmp_path / "snapshots")
+    collector = elite_picks.Collector(api=api, snapshot_dir=tmp_path / "snapshots", out_dir=tmp_path / "out", now=NOW, log=lambda *_: None)
+    config = {"season": "2026-27", "overall_top": [], "named_lists": {}, "sampled": {"top3s": {"ranks": 3, "every": 2}}}
+    members = collector.members(config)
+    assert members["entry_id"].tolist() == [101, 103] and set(members["set"]) == {"top3s"}  # rank_sort 1 and 3
+    sample = elite_picks.load_config()["sampled"]["top10k"]
+    assert sample == {"ranks": 10_000, "every": 10}
+
+
+def test_deadline_picks_undo_automatic_subs():
+    payload = _picks(captain=1)
+    payload["picks"][10]["position"], payload["picks"][11]["position"] = 12, 11  # FPL view after the GW: 12 came on for 11
+    payload["automatic_subs"] = [{"entry": 101, "element_in": 12, "element_out": 11, "event": 5}]
+    rows = {r["fpl_id"]: r for r in elite_picks.deadline_picks(101, 5, payload)}
+    assert rows[11]["position"] == 11 and rows[12]["position"] == 12
+    assert rows[11]["auto_sub"] and rows[12]["auto_sub"] and not rows[1]["auto_sub"]

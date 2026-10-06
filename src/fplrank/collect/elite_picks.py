@@ -89,6 +89,7 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
         "overall_top": [int(n) for n in cfg.get("overall_top", [])],
         "named_lists": {name: [int(e) for e in ids] for name, ids in cfg.get("named_lists", {}).items()},
         "leagues": {name: int(league) for name, league in cfg.get("leagues", {}).items()},
+        "sampled": {name: {"ranks": int(s["ranks"]), "every": int(s["every"])} for name, s in cfg.get("sampled", {}).items()},
         "threshold_ranks": [int(r) for r in cfg.get("threshold_ranks", [])],
     }
 
@@ -127,6 +128,16 @@ class Collector:
                 if not standings["has_next"]:
                     break
             rows += [{"set": f"top{n}", "entry_id": r["entry"], "rank": r["rank"]} for r in results[:n]]
+        for name, spec in config.get("sampled", {}).items():  # every k-th manager of the overall top N
+            for page in range(1, math.ceil(spec["ranks"] / STANDINGS_PAGE_SIZE) + 1):
+                standings = self.fetch(_standings_endpoint(page), self.max_age)["standings"]
+                rows += [
+                    {"set": name, "entry_id": r["entry"], "rank": r["rank"]}
+                    for r in standings["results"]
+                    if r["rank_sort"] <= spec["ranks"] and (r["rank_sort"] - 1) % spec["every"] == 0
+                ]
+                if not standings["has_next"]:
+                    break
         for name, ids in config["named_lists"].items():
             rows += [{"set": name, "entry_id": e, "rank": None} for e in ids]
         for name, league in config.get("leagues", {}).items():  # every member of a classic league
@@ -250,10 +261,7 @@ def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPS
             ranks.append({"entry_id": entry, "gw": h["event"], **{k: v for k, v in h.items() if k != "event"}})
             gw_picks = _latest(f"entry/{entry}/event/{h['event']}/picks/", snapshot_dir)
             if gw_picks is not None:
-                chip = gw_picks["active_chip"]
-                picks += [
-                    {"entry_id": entry, "gw": h["event"], "fpl_id": p["element"], **p, "active_chip": chip} for p in gw_picks["picks"]
-                ]
+                picks += deadline_picks(entry, h["event"], gw_picks)
         chips += [{"entry_id": entry, "gw": c["event"], "chip": c["name"], "time": c["time"]} for c in history["chips"]]
         transfers += [{"entry_id": entry, "gw": t["event"], **t} for t in _latest(f"entry/{entry}/transfers/", snapshot_dir) or []]
 
@@ -278,8 +286,32 @@ def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPS
     return tables
 
 
+def deadline_picks(entry: int, gw: int, payload: dict) -> list[dict]:
+    """Picks rows with `position` as set at the deadline.
+
+    Once a GW has been played, FPL's picks endpoint shows the team after automatic substitutions (a
+    benched sub moved into the XI and the non-player out). Swapping each `automatic_subs` pair back gives
+    the deadline XI, which is what EO means; `auto_sub` marks the swapped players. `multiplier` stays as
+    FPL reports it (after subs). Example: João Pedro, injured in GW5, was in 30 AE64 squads but no XI
+    after subs; at the deadline he was in 4.
+    """
+    rows = {
+        p["element"]: {"entry_id": entry, "gw": gw, "fpl_id": p["element"], **p, "active_chip": payload["active_chip"], "auto_sub": False}
+        for p in payload["picks"]
+    }
+    for sub in payload.get("automatic_subs", []):
+        a, b = rows.get(sub["element_in"]), rows.get(sub["element_out"])
+        if a and b:
+            a["position"], b["position"] = b["position"], a["position"]
+            a["auto_sub"] = b["auto_sub"] = True
+    return list(rows.values())
+
+
 def compute_eo(picks: pd.DataFrame, members: pd.DataFrame, season: str) -> pd.DataFrame:
-    """Deadline EO per set and GW: `season, gw, group, fpl_id, eo, n_managers` (eo 1.0 = 100%)."""
+    """Deadline EO per set and GW: `season, gw, group, fpl_id, eo, n_managers` (eo 1.0 = 100%).
+
+    Needs `position` as set at the deadline (`deadline_picks`); the captain flag is the deadline one too.
+    """
     columns = ["season", "gw", "group", "fpl_id", "eo", "n_managers"]
     if picks.empty:
         return pd.DataFrame(columns=columns)
@@ -443,8 +475,8 @@ def _main(argv=None):
         tables = build(config["season"], threshold_ranks=config["threshold_ranks"])
         print({k: len(v) for k, v in tables.items()})
         return
-    if args.top:
-        config["overall_top"] = [args.top]
+    if args.top:  # quick test: just the top N
+        config["overall_top"], config["sampled"] = [args.top], {}
     start = time.monotonic()
     summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config)
     print(f"Done in {(time.monotonic() - start) / 60:.1f} min: {summary}")
