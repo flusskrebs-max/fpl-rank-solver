@@ -221,3 +221,36 @@ def test_repick_eo_mixes_the_elite_groups_on_next_gw_xp(tmp_path):
     frame, _ = ow.repick_eo("elite", 6, pd.DataFrame({6: xp, 7: later}), collected_dir=tmp_path)
     pd.testing.assert_series_equal(frame[6], eo.reindex(frame.index).fillna(0.0), check_names=False)
     assert frame.loc[14, 7] == pytest.approx(1.0) and frame.loc[13, 7] < 1  # GW7 has its own captain
+
+
+def test_repick_eo_drifts_towards_templates_on_later_gws(tmp_path):
+    pos = [1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4]
+    rows = [(1, 5, pid, i, int(i == 3), pos[i - 1], None) for i, pid in enumerate(range(1, 16), 1)]
+    cols = ["entry_id", "gw", "fpl_id", "position", "is_captain", "element_type", "active_chip"]
+    pd.DataFrame(rows, columns=cols).to_parquet(tmp_path / "picks.parquet")
+    pd.DataFrame({"set": ["top1000"], "entry_id": [1]}).to_parquet(tmp_path / "members.parquet")
+    templates = pd.DataFrame({"template": 0, "fpl_id": range(201, 216), "element_type": pos})
+    xp = pd.Series(1.0, index=[*range(1, 16), *range(201, 216)])
+    frame = pd.DataFrame({6: xp, 7: xp, 14: xp})
+    still, _ = ow.repick_eo("top1000", 6, frame, collected_dir=tmp_path)
+    drift, _ = ow.repick_eo("top1000", 6, frame, collected_dir=tmp_path, templates=templates)
+    pd.testing.assert_series_equal(drift.loc[still.index, 6], still[6])  # next GW untouched
+    assert drift.loc[201:, 6].sum() == 0
+    # squads share no one, so the mean ownership move to the template is 100 points: a = 20.5 / 100 (E64's drift)
+    a = ow.DRIFT_8["E64"] / 100
+    assert drift.loc[201:, 7].sum() == pytest.approx(a * 0.27 * 12)  # XI + captain, 27% of the 8-GW move
+    assert drift.loc[201:, 14].sum() == pytest.approx(a * 12)
+    assert drift[14].sum() == pytest.approx(12)
+
+
+def test_herd_q_shrink_splits_the_armband_evenly():
+    from fplrank.model import eo_blend
+
+    pos = [1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4]
+    rows = pd.DataFrame({"entry_id": 1, "fpl_id": range(1, 16), "element_type": pos})
+    xp = pd.Series(1.0, index=range(1, 16))
+    xp[[13, 14]] = [9.0, 5.0]
+    rows = eo_blend.repick_rows(rows.assign(multiplier=0), xp)
+    sure = eo_blend.herd_captains(rows, xp, conc=1.0).set_index("fpl_id")["captain"]
+    even = eo_blend.herd_captains(rows, xp, conc=1.0, q_shrink=1.0).set_index("fpl_id")["captain"]
+    assert sure[13] > 0.99 and even[13] == pytest.approx(0.5) and even[14] == pytest.approx(0.5)

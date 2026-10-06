@@ -122,3 +122,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
   GW's xP (was next GW's EO reused). Team 157924, top 10k: d = 0.7 picks λ -0.2 (P 30.6% vs 30.3%, EV cost 0.7,
   different GW6 moves); d = 1 costs up to 17 EV at |λ| 0.3. EO persists ~0.95 a GW, so 0.7 is a judgement.
   `docs/research/eo-horizon.md`.
+- 2026-10-06, EOL: later GWs' EO now drifts from the field's squads towards three wildcard solves (his solver, our
+  team, horizons 3/5/8) at last season's drift pace (27/48/64/77/93% of the 8-GW move at 1/2/3/4/6 GWs, size set
+  to the real 8-GW move); captain split evened out further ahead; next GW unchanged. `--eo_drift false` = old.
+  Team 157924, top 10k, elite: same λ (-0.05) and same plan, P 38% → 29% (the field's upgrades cut our projected
+  edge from 14.3 to 8.7 over 8 GWs). `docs/research/eo-horizon.md`.

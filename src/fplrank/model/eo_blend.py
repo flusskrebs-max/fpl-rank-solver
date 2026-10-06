@@ -106,7 +106,7 @@ def next_gw_eo(picks: pd.DataFrame, gw: int, xp: pd.Series, conc: float | None =
 
 
 def herd_captains(
-    rows: pd.DataFrame, xp: pd.Series, conc: float = 0.94, tau: float = HERD_TAU, min_xi: float = HERD_MIN_XI
+    rows: pd.DataFrame, xp: pd.Series, conc: float = 0.94, tau: float = HERD_TAU, min_xi: float = HERD_MIN_XI, q_shrink: float = 0.0
 ) -> pd.DataFrame:
     """(b) with the armband herded onto the group's consensus captain (eo-patterns-2025-26.md §5).
 
@@ -117,7 +117,8 @@ def herd_captains(
     tau)). Every manager's armband goes conc x q to c1, conc x (1 - q) to c2 and 1 - conc to their own re-picked
     captain. A manager who doesn't start c1 (or c2) buys him with that probability, starting him in place of
     their lowest-xP starter in his position. Multipliers are expected ones, so they can be fractional; `captain`
-    is the expected armband.
+    is the expected armband. `q_shrink` pulls q towards 0.5 (1: an even split), for GWs further ahead, where the
+    projected top captain is less certain to be the field's.
     """
     xi = rows[rows["multiplier"] >= 1]
     share = xi.groupby("fpl_id")["entry_id"].nunique() / rows["entry_id"].nunique()
@@ -125,6 +126,7 @@ def herd_captains(
     if len(x) < 2:
         return rows
     q = 1 / (1 + np.exp(-(x.iloc[0] - x.iloc[1]) / tau))
+    q = 0.5 + (q - 0.5) * (1 - q_shrink)
     pos = rows.drop_duplicates("fpl_id").set_index("fpl_id")["element_type"]
     out = []
     for _, r in rows.groupby("entry_id", sort=False):

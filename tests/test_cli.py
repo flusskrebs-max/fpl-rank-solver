@@ -48,7 +48,7 @@ def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys, monkeypat
     monkeypatch.setattr(target, "season_drift", lambda rank, group: target.SeasonDrift(rank, group, 2.5, 0.5, ("a", "b")))
     ids = [e["id"] for e in request_fn(cli.BOOTSTRAP)["elements"]]
     eo = pd.Series(1.5, index=ids[:40])
-    load_eo = lambda group, bootstrap, gw, projections: (eo, f"{group} test")  # noqa: E731
+    load_eo = lambda group, bootstrap, gw, projections, templates=None: (eo, f"{group} test")  # noqa: E731
     assert cli.solve([*HIS_FLAGS, "--eo", "AE64", "--target", "10000", "--points", "300"], request_fn, load_eo) == 0
     out = capsys.readouterr().out
     assert "EO AE64 test; λ in full on GW6, then x0.7 a GW" in out
@@ -61,7 +61,7 @@ def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys, monkeypat
 def test_sims_run_his_simulations_at_the_fixed_lambda(request_fn, capsys):
     ids = [e["id"] for e in request_fn(cli.BOOTSTRAP)["elements"]]
     eo = pd.Series(1.5, index=ids[:40])
-    load_eo = lambda group, bootstrap, gw, projections: (eo, f"{group} test")  # noqa: E731
+    load_eo = lambda group, bootstrap, gw, projections, templates=None: (eo, f"{group} test")  # noqa: E731
     assert cli.solve([*HIS_FLAGS, "--eo", "AE64", "--lam", "0.1", "--sims", "2"], request_fn, load_eo) == 0
     out = capsys.readouterr().out
     assert "--- Sertalp's simulations: 2 runs ---" in out
