@@ -87,3 +87,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
   the λ = 0 solve isn't reaching the optimum; not yet looked at.
 - 2026-10-06, CLI 1/4: `solve_ev` now runs every solve through Sertalp's `solve_regular` (as simulations.py does): λ-adjusted
   projections go in as his `data/fplrank.csv`, his settings files apply, his solutions come back. Our own prep/solve calls removed.
+- 2026-10-06, CLI 2/4: `uv run fplrank solve` = his solve.py (his settings and flags unchanged) plus `--eo`, `--target`, `--lam`:
+  his projections are λ-scaled on read, one solve per λ, best P(target) chosen, his output for that plan under a short λ block.

@@ -79,6 +79,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   CLI: add `--target-rank 10000 [--points N]` to the S1 command. `src/fplrank/model/variance.py`: S2b v(xP) table.
 - `src/fplrank/weekly.py`: R1. `uv run python -m fplrank.weekly --team <id> --target 10000` runs S1 + S2c and writes
   `reports/GW{n}.md` (git-ignored). `run(Inputs(...), mode)`: mode `optimum` (R1) or `simulate` (R2, not built).
+- `src/fplrank/cli.py`: `fplrank solve`. His `solve_regular` with his flags; `--eo/--target/--lam` scale his projections
+  on read (next GW only), solve per λ, pick the best P(target) and print his output for that plan.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
 - `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (thinking; `data-sources.md` = which
@@ -95,6 +97,7 @@ uv run python scripts/smoke_baseline.py
 uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
 uv run python -m fplrank.collect.elite_picks collect [--top N]     # FPL API: Alex's PC only
 uv run python -m fplrank.opt.ownership --team <id> --eo AE64 --sweep  # S1 plans per λ (live API)
+uv run fplrank solve --team_id <id> --eo AE64 --target 10000      # his solve.py + λ choice (his flags pass through)
 ```
 
 ## Conventions
