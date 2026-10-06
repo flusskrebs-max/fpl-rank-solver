@@ -191,7 +191,6 @@ def results(output: str) -> None:
         st.subheader("P by λ")
         chart = pd.DataFrame({"λ": [f"{k:g}" for k in sorted(ps)], "P": [ps[k] for k in sorted(ps)]}).set_index("λ")
         st.bar_chart(chart, y="P")
-        st.caption("λ below 0 leans towards differentials (more risk against the field); above 0 towards players the field owns.")
     st.subheader("Full output")
     st.code(output, language=None)
 
