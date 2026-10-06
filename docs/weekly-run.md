@@ -73,6 +73,16 @@ Type your real team id in place of `<your team id>` (PowerShell rejects the `<`)
 It prints one line per λ as each solve finishes, then the EO used, the gap to the target line, P by λ,
 and his normal output for the chosen plan.
 
+### Or use the page
+
+```powershell
+uv run fplrank page
+```
+
+This opens a page in your browser (http://localhost:8501) with the same options as boxes and a Solve button. It
+shows the command it runs, the output as it comes, and P by λ as a chart. It remembers your team id. Steps 1 to 3
+still apply. Close the PowerShell window (or press Ctrl+C in it) to stop the page.
+
 ## 5. Read the plan and decide
 
 P by λ shows how much the choice matters: early in the season the differences are small, because one

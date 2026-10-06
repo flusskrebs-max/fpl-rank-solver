@@ -17,6 +17,7 @@ dependencies = [
     "fuzzywuzzy",
     "python-Levenshtein",
     "pyarrow>=25.0.1",
+    "streamlit>=1.65.0",
 ]
 
 [project.scripts]
