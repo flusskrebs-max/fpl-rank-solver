@@ -253,8 +253,6 @@ def _live_inputs(team_id: int):
 
 
 def _main(argv=None):
-    from fplrank.data import projections as proj_store
-
     p = argparse.ArgumentParser(description="Ownership-weighted EV solve (S1)")
     p.add_argument("--team", type=int, required=True, help="FPL team (entry) id")
     p.add_argument("--eo", default="AE64", help="EO group: AE64, E64, top1000, top10k, or solio (Solio's per-GW EO forecast)")
@@ -281,31 +279,10 @@ def _main(argv=None):
 
     my_data, bootstrap, fixtures = _live_inputs(args.team)
     next_gw = next(e["id"] for e in bootstrap["events"] if e["is_next"])
-    path = args.projections
-    if path is None:
-        try:
-            path = proj_store.latest(next_gw)
-        except LookupError:
-            print("No Solio file registered for this GW: using FPL's ep_next (crude, one GW repeated per fixture)")
-            path = "ep_next"
-    if str(path) == "ep_next":
-        projections = proj_store.from_ep_next(bootstrap, fixtures, args.horizon)
-    else:
-        projections = pd.read_csv(path, encoding="utf-8-sig")
     if args.eo_forecast and args.eo == "solio":
         p.error("--eo-forecast forecasts a collected group's EO; Solio's export is already a forecast")
-    if args.eo == "solio":
-        eo = load_solio_eo(bootstrap)
-        first = eo_for(eo, next_gw)
-        eo_text = (
-            f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {int((first > 0).sum())} players, total {first.sum():.1f})"
-        )
-    elif args.eo_forecast:
-        eo = forecast_eo(args.eo, next_gw)
-        eo_text = f"{args.eo} forecast for the GW{next_gw} deadline, repeated ({int((eo > 0.005).sum())} players, total {eo.sum():.1f})"
-    else:
-        eo, eo_gw = load_eo(args.eo, next_gw - 1)
-        eo_text = f"{args.eo} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
+    projections, path = pick_projections(args.projections, bootstrap, fixtures, next_gw, args.horizon)
+    eo, eo_text = pick_eo(args.eo, bootstrap, next_gw, forecast=args.eo_forecast)
     lam_gw = None if args.lam_all_gws else next_gw
     lam_text = "every GW" if lam_gw is None else f"GW{next_gw} only"
     print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {eo_text}; λ on {lam_text}")
@@ -320,33 +297,84 @@ def _main(argv=None):
         _rank_goal(args, solutions, projections, eo, next_gw)
 
 
-def _rank_goal(args, solutions, projections, eo, next_gw):
-    """S2c: P(finishing at or above the target line) per λ, and the λ that maximises it."""
+def pick_projections(path, bootstrap: dict, fixtures: list, next_gw: int, horizon: int) -> tuple[pd.DataFrame, str]:
+    """Projections for the solve and where they came from: `path`, else the newest Solio file registered for
+    `next_gw`, else FPL's `ep_next` (crude, one GW repeated per fixture)."""
+    from fplrank.data import projections as proj_store
+
+    if path is None:
+        try:
+            path = proj_store.latest(next_gw)
+        except LookupError:
+            print("No Solio file registered for this GW: using FPL's ep_next (crude, one GW repeated per fixture)")
+            path = "ep_next"
+    if str(path) == "ep_next":
+        return proj_store.from_ep_next(bootstrap, fixtures, horizon), "ep_next"
+    return pd.read_csv(path, encoding="utf-8-sig"), str(path)
+
+
+def pick_eo(group: str, bootstrap: dict, next_gw: int, forecast: bool = False) -> tuple[pd.Series | pd.DataFrame, str]:
+    """EO for `group` (a collector group, or 'solio') and a one-line description of it.
+
+    forecast: B04's forecast of the group's EO at the `next_gw` deadline (S1c) instead of last GW's collected EO.
+    """
+    if group == "solio":
+        eo = load_solio_eo(bootstrap)
+        first = eo_for(eo, next_gw)
+        players = int((first > 0).sum())
+        return eo, f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {players} players, total {first.sum():.1f})"
+    if forecast:
+        eo = forecast_eo(group, next_gw)
+        return eo, f"{group} forecast for the GW{next_gw} deadline, repeated ({int((eo > 0.005).sum())} players, total {eo.sum():.1f})"
+    eo, eo_gw = load_eo(group, next_gw - 1)
+    return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
+
+
+def drift_group(eo_group: str, override: str | None = None) -> str:
+    """Collector group for the line's drift: `override`, else the EO group if it is a fixed list, else AE64."""
+    # top1000/top10k are today's top managers, so their drift is biased low (V1); default to a fixed list
+    return override or (eo_group if eo_group in ("AE64", "E64") else "AE64")
+
+
+def current_standing(team_id: int) -> tuple[int, int | None]:
+    """Our total points and overall rank after the last finished GW (live API)."""
     from fplrank.data.fpl_api import FplApi
+
+    last = FplApi().entry_history(team_id)["current"][-1]
+    return last["total_points"], last.get("overall_rank")
+
+
+def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=0.3) -> tuple[pd.DataFrame, str]:
+    """S2c: P(finishing at or above the top-`target_rank` line) per λ, best first, and a line describing the gap."""
     from fplrank.model import variance
     from fplrank.opt import rank_goal
     from fplrank.rank import target
 
-    points = args.points
-    if points is None:
-        points = FplApi().entry_history(args.team)["current"][-1]["total_points"]
-    # top1000/top10k are today's top managers, so their drift is biased low (V1); default to a fixed list
-    group = args.drift_group or (args.eo if args.eo in ("AE64", "E64") else "AE64")
-    line = target.target_line(args.target_rank)
-    drift, _ = target.line_drift(args.target_rank, group)
+    line = target.target_line(target_rank)
+    drift, _ = target.line_drift(target_rank, group)
     gws_left = 38 - next_gw + 1
     gap = line.now - points + drift * gws_left
     vtable = variance.build()
     plans = {
-        lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=args.kappa), "ev": sol["ev"]}
+        lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=kappa), "ev": sol["ev"]}
         for lam, sol in solutions.items()
     }
     table = rank_goal.choose_lambda(gap, gws_left, plans, sd_line=line.sd)
-    print()
-    print(
-        f"Top {args.target_rank:,} line {line.now:.0f} after GW{line.gw}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
-        f" gap to close {gap:.0f} over {gws_left} GWs (κ = {args.kappa:g}, s = 1)"
+    text = (
+        f"Top {target_rank:,} line {line.now:.0f} after GW{line.gw}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
+        f" gap to close {gap:.0f} over {gws_left} GWs (κ = {kappa:g}, s = 1)"
     )
+    return table, text
+
+
+def _rank_goal(args, solutions, projections, eo, next_gw):
+    from fplrank.opt import rank_goal
+
+    points = args.points if args.points is not None else current_standing(args.team)[0]
+    group = drift_group(args.eo, args.drift_group)
+    table, text = rank_goal_table(solutions, projections, eo, next_gw, args.target_rank, points, group, args.kappa)
+    print()
+    print(text)
     with pd.option_context("display.width", 200):
         print(table.round(3).to_string(index=False))
     print(rank_goal.report(table, args.target_rank, args.kappa))

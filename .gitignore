@@ -31,3 +31,6 @@ team.json
 !vendor/open-fpl-solver/data/results/.gitkeep
 !vendor/open-fpl-solver/run/tmp/.gitkeep
 !vendor/open-fpl-solver/run/tmp/.gitignore
+
+# Weekly reports (Solio-derived numbers)
+reports/
