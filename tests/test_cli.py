@@ -40,7 +40,12 @@ def test_no_extras_is_just_his_solver(request_fn, capsys):
 
 
 @pytest.mark.slow
-def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys):
+def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys, monkeypatch):
+    from fplrank.rank import target
+
+    # the line comes from collected data on Alex's PC; CI has none
+    monkeypatch.setattr(target, "target_line", lambda rank: target.TargetLine(rank, 5, 398, 55, 398 + 33 * 55, 40, ("test",)))
+    monkeypatch.setattr(target, "line_drift", lambda rank, group: (2.5, None))
     ids = [e["id"] for e in request_fn(cli.BOOTSTRAP)["elements"]]
     eo = pd.Series(1.5, index=ids[:40])
     load_eo = lambda group, bootstrap, gw: (eo, f"{group} test")  # noqa: E731
