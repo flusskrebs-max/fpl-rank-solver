@@ -242,7 +242,7 @@ def _main(argv=None):
     p.add_argument("--secs", type=int, default=600, help="time limit per solve (upstream default; solves usually finish in seconds)")
     p.add_argument("--target-rank", type=int, help="S2: also choose λ for finishing at or above this overall rank")
     p.add_argument("--points", type=int, help="S2: our total points now (default: from the FPL API)")
-    p.add_argument("--drift-group", help="S2: collector group for the line's drift (default: --eo, or top10k for solio)")
+    p.add_argument("--drift-group", help="S2: collector group for the line's drift (default: --eo if AE64/E64, else AE64)")
     p.add_argument("--kappa", type=float, default=0.3, help="S2: share of our projected edge over the field taken as real")
     args = p.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")  # player names on the Windows console
@@ -291,7 +291,8 @@ def _rank_goal(args, solutions, projections, eo, next_gw):
     points = args.points
     if points is None:
         points = FplApi().entry_history(args.team)["current"][-1]["total_points"]
-    group = args.drift_group or ("top10k" if args.eo == "solio" else args.eo)
+    # top1000/top10k are today's top managers, so their drift is biased low (V1); default to a fixed list
+    group = args.drift_group or (args.eo if args.eo in ("AE64", "E64") else "AE64")
     line = target.target_line(args.target_rank)
     drift, _ = target.line_drift(args.target_rank, group)
     gws_left = 38 - next_gw + 1

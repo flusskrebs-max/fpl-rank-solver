@@ -72,3 +72,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, S2c: `fplrank.opt.rank_goal` + S1 CLI `--target-rank [--points]`. Live, rank-1 team's squad, top 10k, AE64,
   GW6, 33 GWs left: P 53% / 36% / 20% with 450 / 398 / 340 points; across λ P moves by at most ~1.3 points (season sd ~72
   dwarfs a 4-GW plan's effect), matching the review's "a few points, not tens" check. Ties go to λ near 0.
+- 2026-10-06, V1: realised spread vs S2's sd on GW1-5: ratio 0.97-0.99 (top 1000, top 10k), 0.82-0.86 (AE64, E64),
+  all within 20%, so s = 1. Report: `docs/research/realised-spread.md` (with drift by group).
