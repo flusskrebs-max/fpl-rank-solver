@@ -1,6 +1,6 @@
 # S1c: EO at the deadline
 
-Status: Ready · Size: small · Release: v0.1 · Depends on: S1 (PR #14), B04 (`model/ownership.py`)
+Status: On hold (2026-10-06): a Solio export with EO may replace this for the next GW (ADR 0004) · Size: small · Release: v0.1 · Depends on: S1 (PR #14), B04 (`model/ownership.py`)
 
 ## Why
 

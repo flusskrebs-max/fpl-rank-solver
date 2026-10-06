@@ -72,7 +72,7 @@ uses B04's one-step forecast for the GW being decided.
 
 | Source | Gives | Access | Verdict |
 |---|---|---|---|
-| Solio | Multi-GW xP, our main input | Paid, local only | Keep |
+| Solio | Multi-GW xP, our main input; EO possibly (Alex has access; none of the registered exports has it yet) | Paid, local only | Keep. EO from Solio would be an S1 source (S1d, ADR 0004) |
 | **FPL `ep_next`** | One-GW xP for every player | Free, in `bootstrap-static` (and Core Insights history) | **P1 as a fallback / test input**: lets S1's CLI and tests run when no Solio file is present, and in cloud sessions via Core Insights |
 | [FPL Review](https://docs.fplreview.com/getting-started/premium-features/) | Multi-GW xP, "Massive Data" model, 14-GW horizon | Free planner; CSV export is premium | **P3**: a second opinion if we want to test sensitivity of λ to the projection source. Same export shape as Solio is likely, since open-fpl-solver reads both |
 | Fantasy Football Hub, Fantasy Football Fix, FPL Copilot | Projections | Paid (Hub, Fix); Copilot free table, no documented export | Skip for now |
