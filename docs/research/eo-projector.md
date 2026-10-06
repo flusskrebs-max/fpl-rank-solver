@@ -1,6 +1,6 @@
 # EO projector: proposal (2026-10-06)
 
-Status: proposal. Idea 1 built and tested 2026-10-06: fails the pass criteria (`eo-flow-v1.md`). Scope: this project builds only the EO projection and the λ
+Status: proposal. Idea 1 built and tested 2026-10-06: fails the pass criteria (`eo-flow-v1.md`). Idea 3 built and tested 2026-10-06 (`eo-naive-field.md`); approach agreed below. Scope: this project builds only the EO projection and the λ
 choice; Sertalp's solver runs unchanged. This note covers Alex's three ideas (thread "EO projector",
 2026-10-06) and which to try first.
 
@@ -79,6 +79,15 @@ Run his solver with λ = 0 (pure EV) as a sensible manager would, and read off w
   "group template" squad per GW, horizon 1) is possible but weak.
 - Use: either as the forecast itself ("solver flow"), or as one more input in idea 1 (Δ logit
   ownership on solver-predicted flow). The second is safer: the field doesn't follow a solver exactly.
+
+## Agreed approach (Alex, 2026-10-06)
+
+`fplrank solve` applies λ to the next GW only, and EO for GW+2 onwards only enters plan scoring. So solver time goes on the next GW, and the long horizon only needs the field's direction of travel.
+- Weekly (~10 min): cluster the AE64+E64 squads (deduped on squad, bank, FTs) to ~20 representatives weighted by count; one H3 solve each with a time limit, giving next-GW flows, blended with persistence. Then ~4 H8 wildcard solves with varied settings, averaged into EO_wc. EO for GW+k = next-GW EO + w(k) × (EO_wc − next-GW EO), with w(k) fitted.
+- Occasionally (overnight): the full every-squad H8 run with variants, on 2-3 deadlines to fit the persistence weight and w(k), then every ~5 GWs to check. The blend only has to approximate it. Score on xP-weighted EO error.
+- Time-limit every field solve: the field isn't optimal, so near-optimal plans are fine and the runtime stops growing steeply with horizon.
+
+First evidence for it (`eo-naive-field.md`): the per-manager run's EO gain over persistence comes mostly from re-picking XI and captain, which the H3 representative solves keep; a blend that only scales current EO and mixes in wildcard templates stays close to persistence.
 
 ## Recommendation: what to try first
 
