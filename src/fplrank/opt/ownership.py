@@ -35,6 +35,35 @@ SWEEP = (-0.3, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.3)
 _PTS = re.compile(r"^(\d+)_Pts$")
 
 
+def load_solio_eo(bootstrap: dict, path=None) -> pd.DataFrame:
+    """Solio's EO forecast (`Name, Team, Price, Avg EO %, GW6 EO %, ...`) as fpl_id x GW (fraction).
+
+    The export has no FPL ids, so players are matched on web name (accents ignored) and team. Default
+    path: the newest file in data/projections/solio_eo/ (paid data, never committed).
+    """
+    import unicodedata
+
+    from fplrank.paths import PROJECTIONS_DIR
+
+    def norm(s):
+        return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower().strip()
+
+    if path is None:
+        files = sorted((PROJECTIONS_DIR / "solio_eo").glob("*.csv"))
+        if not files:
+            raise FileNotFoundError(f"No Solio EO export in {PROJECTIONS_DIR / 'solio_eo'}")
+        path = files[-1]
+    raw = pd.read_csv(path, encoding="utf-8-sig")
+    teams = {t["id"]: t["short_name"] for t in bootstrap["teams"]}
+    ids = {(norm(e["web_name"]), teams[e["team"]]): e["id"] for e in bootstrap["elements"]}
+    raw["fpl_id"] = [ids.get((norm(n), t)) for n, t in zip(raw["Name"], raw["Team"], strict=True)]
+    if missing := raw.loc[raw["fpl_id"].isna(), "Name"].tolist():
+        print(f"Solio EO: {len(missing)} players not matched to FPL ids, left out: {missing[:10]}")
+    gw_cols = {c: int(c[2:].split()[0]) for c in raw.columns if c.startswith("GW") and c.endswith("EO %")}
+    out = raw.dropna(subset=["fpl_id"]).set_index(raw["fpl_id"].dropna().astype(int))[list(gw_cols)]
+    return out.rename(columns=gw_cols).div(100)
+
+
 def load_eo(group: str, gw: int | None = None, collected_dir=COLLECTED_DIR) -> tuple[pd.Series, int]:
     """Latest EO for `group` at or before `gw`, as fpl_id -> EO (fraction), and the GW it is from.
 
@@ -62,13 +91,21 @@ def load_eo(group: str, gw: int | None = None, collected_dir=COLLECTED_DIR) -> t
     return eo.set_index("fpl_id")["eo"].astype(float), latest
 
 
-def adjust_projections(projections: pd.DataFrame, eo: pd.Series, lam: float) -> pd.DataFrame:
-    """Scale every `{gw}_Pts` column by (1 + lam x (EO - 1)). The same EO is used for every GW."""
+def eo_for(eo: pd.Series | pd.DataFrame, gw: int) -> pd.Series:
+    """EO (fpl_id -> fraction) for `gw`. `eo` is one Series used for every GW, or a frame with one column
+    per GW (e.g. Solio's EO forecast); GWs beyond its last column reuse the last one."""
+    if isinstance(eo, pd.Series):
+        return eo
+    cols = [c for c in eo.columns if c <= gw] or [min(eo.columns)]
+    return eo[max(cols)]
+
+
+def adjust_projections(projections: pd.DataFrame, eo: pd.Series | pd.DataFrame, lam: float) -> pd.DataFrame:
+    """Scale every `{gw}_Pts` column by (1 + lam x (EO - 1)), with that GW's EO (see `eo_for`)."""
     out = projections.copy()
-    factor = 1 + lam * (out["ID"].map(eo).fillna(0.0) - 1)
     for col in out.columns:
-        if _PTS.match(col):
-            out[col] = out[col] * factor
+        if m := _PTS.match(col):
+            out[col] = out[col] * (1 + lam * (out["ID"].map(eo_for(eo, int(m[1]))).fillna(0.0) - 1))
     return out
 
 
@@ -89,6 +126,7 @@ def score_plan(solution: dict, projections: pd.DataFrame, eo: pd.Series, hit_cos
     xp = _raw_xp(projections)
     weeks = sorted(int(w) for w in picks["week"].unique())
     nxt = weeks[0]
+    eo = eo_for(eo, nxt)
     hits = {int(w): s.get("pt", 0) * hit_cost for w, s in solution["statistics"].items()}
 
     def week_ev(w):
@@ -193,7 +231,7 @@ def _main(argv=None):
 
     p = argparse.ArgumentParser(description="Ownership-weighted EV solve (S1)")
     p.add_argument("--team", type=int, required=True, help="FPL team (entry) id")
-    p.add_argument("--eo", default="AE64", help="EO group: AE64, E64 or top1000")
+    p.add_argument("--eo", default="AE64", help="EO group: AE64, E64, top1000, top10k, or solio (Solio's per-GW EO forecast)")
     p.add_argument("--lam", type=float, nargs="+", help="one or more λ values")
     p.add_argument("--sweep", action="store_true", help=f"λ in {SWEEP}")
     p.add_argument(
@@ -218,8 +256,16 @@ def _main(argv=None):
         projections = proj_store.from_ep_next(bootstrap, fixtures, args.horizon)
     else:
         projections = pd.read_csv(path, encoding="utf-8-sig")
-    eo, eo_gw = load_eo(args.eo, next_gw - 1)
-    print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {args.eo} GW{eo_gw} ({len(eo)} players, total {eo.sum():.1f})")
+    if args.eo == "solio":
+        eo = load_solio_eo(bootstrap)
+        first = eo_for(eo, next_gw)
+        eo_text = (
+            f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {int((first > 0).sum())} players, total {first.sum():.1f})"
+        )
+    else:
+        eo, eo_gw = load_eo(args.eo, next_gw - 1)
+        eo_text = f"{args.eo} GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
+    print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {eo_text}")
 
     lams = SWEEP if args.sweep or not args.lam else args.lam
     options = {"horizon": args.horizon, "secs": args.secs}

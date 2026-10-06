@@ -3,6 +3,18 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-06: Solio EO forecast (GW6-24)
+
+- Alex's Solio "effective ownership" export (`data/projections/solio_eo/`, paid, never committed):
+  `Name, Team, Price, Avg EO %, GW6 EO % ... GW24 EO %`, 562 players, no FPL ids. All 562 match FPL ids
+  on web name (accents ignored) + team; prices agree. GW6 total 1203% (≈ 12 per manager), 128 players > 0.
+- Against our GW5 EO (all players): correlation 0.89 with top1000 and E64, 0.77 with AE64, 0.90 with
+  overall `selected_by_percent`; mean absolute gap over Solio's top 40: top1000 12, E64 15, AE64 20 points.
+  Biggest differences: João Pedro 69% (elite groups ~0, overall ownership 65%), Palmer 47% (AE64 89%),
+  Szoboszlai 34% (AE64 81%), Wissa 23% (AE64 70%). So Solio's EO looks like a broad field, not an elite
+  group; which tier it models is to be confirmed with Alex.
+- It is a multi-GW forecast, so S1 can use a different EO per GW (`--eo solio`, S1d).
+
 ## 2026-10-06: FPL `ep_next` is a form measure, not a projection
 
 - For GW6 (bootstrap before the deadline) the highest `ep_next` values are Groß 15.5, Schade 12.0, Bogle

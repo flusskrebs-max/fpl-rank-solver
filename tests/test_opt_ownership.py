@@ -189,3 +189,25 @@ def test_s1_runs_offline_on_a_real_team_with_ep_next():
     eo = pd.Series({e["id"]: 1.5 for e in bootstrap["elements"][:40]})
     s0 = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
     assert ow.plan_key(s0) == ow.plan_key(ev)
+
+
+def test_solio_eo_matches_names_and_varies_by_gw(tmp_path):
+    bootstrap = {
+        "teams": [{"id": 1, "short_name": "CHE"}, {"id": 2, "short_name": "MCI"}],
+        "elements": [{"id": 165, "web_name": "João Pedro", "team": 1}, {"id": 411, "web_name": "Haaland", "team": 2}],
+    }
+    path = tmp_path / "eo.csv"
+    rows = [
+        "Name,Team,Price,Avg EO %,GW6 EO %,GW7 EO %",
+        '"Haaland",MCI,15.6,150,147,166',
+        '"Joao Pedro",CHE,7.7,70,69,71',
+        '"Nobody",ARS,4,0,0,0',
+    ]
+    path.write_text("\ufeff" + "\n".join(rows) + "\n", encoding="utf-8")
+    eo = ow.load_solio_eo(bootstrap, path)
+    assert eo.loc[411, 7] == pytest.approx(1.66) and eo.loc[165, 6] == pytest.approx(0.69) and len(eo) == 2
+    proj = pd.DataFrame({"ID": [411, 165], "6_Pts": [6.0, 4.0], "7_Pts": [6.0, 4.0], "8_Pts": [6.0, 4.0]})
+    adj = ow.adjust_projections(proj, eo, 0.1)
+    assert adj.loc[0, "6_Pts"] == pytest.approx(6 * (1 + 0.1 * 0.47))
+    assert adj.loc[0, "7_Pts"] == pytest.approx(6 * (1 + 0.1 * 0.66))
+    assert adj.loc[0, "8_Pts"] == adj.loc[0, "7_Pts"]  # beyond the forecast: last GW reused
