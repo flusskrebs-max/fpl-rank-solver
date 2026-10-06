@@ -14,10 +14,10 @@ Everything happens in Claude Code. You are both **PM** and **lead developer**; A
 The repo is the only memory: if it isn't committed, the next session won't know it.
 
 **Each session**
-1. Read `docs/tasks/TASKS.md` (the queue) and `docs/pm/pm-handover.md` (context and priorities).
+1. Read `docs/roadmap.md` (releases), `docs/tasks/TASKS.md` (the queue) and `docs/pm/pm-handover.md` (PM context).
    Long chats are compacted automatically; anything that must survive goes in these files.
 2. Take the top task that isn't DONE, or ask Alex if the queue is empty or a decision is his.
-3. Finish by updating `TASKS.md` (status + a dated note) and, if anything durable changed,
+3. Finish by updating `TASKS.md` (status) and `docs/tasks/log.md` (one dated line) and, if anything durable changed,
    `docs/data-log.md`, `docs/decisions/` or the relevant `docs/research/` report.
 
 **Planning (PM hat)**
@@ -64,8 +64,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.
   All tunable constants in `Params`. `sim/calibration.py`: tuned on 2023-24, tested on 2024-25, checked on
   2025-26 against an empirical benchmark (`docs/research/scenario-calibration.md`).
-- `docs/tasks/TASKS.md` (the queue) and `docs/tasks/briefs/` (open briefs); `docs/briefs/` (finished
-  briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
+- `docs/tasks/TASKS.md` (the queue, grouped by release), `docs/tasks/log.md` (dated notes), `docs/tasks/briefs/`
+  (open briefs); `docs/briefs/` (finished briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
 - `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/ownership.py`: S1 ownership-weighted solve. `adjust_projections(proj, eo, lam)`,
@@ -73,7 +73,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   CLI `uv run python -m fplrank.opt.ownership --team <id> --eo AE64|E64|top1000 --sweep` (live API).
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
-- `docs/roadmap.md` (phases), `docs/components.md` (what we need), `docs/research/` (thinking),
+- `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (thinking; `data-sources.md` = which
+  data we use and why),
   `docs/decisions/` (ADRs: add one for any decision that would be expensive to reverse).
 
 ## Commands

@@ -1,7 +1,9 @@
 # Solver design and test plan (v0.1)
 
-Written 2026-10-05 in Cowork after the Phase 1 brainstorm. Proposed home in the repo:
-`docs/research/solver-design.md`. Nothing here is final; it is the plan we test against.
+Written 2026-10-05 in Cowork after the Phase 1 brainstorm. Nothing here is final; it is the plan we test against.
+
+**v1 route as of 2026-10-06:** S1 (λ knob, built) + S2 (λ from a normal approximation) + B04b (EO
+forecast). [A] simulation, [D] rollout and V are parked. Release order is in `docs/roadmap.md`.
 
 ## 1. What already exists (prior art)
 
@@ -169,13 +171,6 @@ piece testable on its own, and is easy to parallelise.
 4. **Overfitting the field model** to a few weeks of data. Mitigation: 2–4-parameter models, out-of-sample checks.
 5. **Compute.** Mitigation: candidates are cheap MILPs (seconds each), simulation is vectorised.
 
-## 7. Suggested build order
+## 7. Build order
 
-1. B01b: residual-based fill for unlisted EO (the flat floor overcounts).
-2. B02 projection loader.
-3. Rank-line data: live `T_X(now)` from standings; end-of-season cut-offs for past seasons from B03's `past` sample (spread term only).
-4. [A] Scenario engine v0 + calibration report.
-5. [B] Field engine v0 (B04) + backtest vs persistence.
-6. [C]+[D] Candidate sweep + evaluator for a single GW (no rollout yet), with known-answer tests.
-7. V by simulation; then rollout.
-8. Policy backtests.
+Superseded on 2026-10-06 by the releases in `docs/roadmap.md`.
