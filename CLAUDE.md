@@ -8,6 +8,41 @@ A Fantasy Premier League solver that maximises **P(final rank ≤ X)** instead o
 Built on the vendored open-fpl-solver (HiGHS via `highspy`). Owner: Alex, who is new to Claude
 Code and git; explain git/GitHub steps briefly when they come up.
 
+## How we work
+
+Everything happens in Claude Code. You are both **PM** and **lead developer**; Alex sets direction.
+The repo is the only memory: if it isn't committed, the next session won't know it.
+
+**Each session**
+1. Read `docs/tasks/TASKS.md` (the queue) and `docs/pm/pm-handover.md` (context and priorities).
+2. Take the top task that isn't DONE, or ask Alex if the queue is empty or a decision is his.
+3. Finish by updating `TASKS.md` (status + a dated note) and, if anything durable changed,
+   `docs/data-log.md`, `docs/decisions/` or the relevant `docs/research/` report.
+
+**Planning (PM hat)**
+- Before building anything non-trivial, write a short brief in `docs/tasks/briefs/` (why, what to do,
+  checks, "done when"). Use plan mode for design work. Keep briefs small enough for one PR.
+- Check work against `docs/research/solver-design.md` (architecture and test plan). Update it when a
+  design decision changes, and record decisions that would be costly to reverse as ADRs.
+- Prefer simple, testable models over clever ones; out-of-sample checks before trusting any fit;
+  write pass criteria before looking at test results.
+
+**Building (developer hat)**
+- Delegate well-specified implementation to subagents and pick the model for the job:
+  Sonnet for routine coding, refactors, data plumbing and tests; Opus for design, modelling and
+  calibration work, and for reviewing a subagent's result before it's committed.
+- Give each subagent the brief, the files it may touch and the checks it must pass. Review its diff,
+  run `uv run pytest` and `uv run ruff check .` yourself, then commit.
+- One branch and PR per brief. Explain git/GitHub steps to Alex briefly when he needs to act.
+
+**Talking to Alex**
+- British spelling. Short and plain; no filler, no "genuinely", no "great question".
+- Lead with what changed and what needs his decision.
+
+**Never**
+- Commit paid projection files (Solio CSVs) or anything under `data/`.
+- Edit `vendor/open-fpl-solver/` (update it with `scripts/update_upstream.sh`).
+
 ## Where things are
 
 - `src/fplrank/baseline.py`: `solve_ev(my_data, projections, bootstrap, fixtures, options)` runs the
@@ -29,6 +64,9 @@ Code and git; explain git/GitHub steps briefly when they come up.
   -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.
   All tunable constants in `Params`. `sim/calibration.py`: tuned on 2023-24, tested on 2024-25, checked on
   2025-26 against an empirical benchmark (`docs/research/scenario-calibration.md`).
+- `docs/tasks/TASKS.md` (the queue) and `docs/tasks/briefs/` (open briefs); `docs/briefs/` (finished
+  briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
+- `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.

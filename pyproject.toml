@@ -43,7 +43,7 @@ markers = [
 [tool.ruff]
 line-length = 140
 target-version = "py313"
-extend-exclude = ["vendor"]
+extend-exclude = ["vendor", "scripts/elite64"]  # scripts/elite64: Cowork originals kept as written
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "UP", "RUF"]
