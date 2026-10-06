@@ -109,3 +109,7 @@ One line per finished task or decision from now on; detail belongs in the PR and
   pace). Removed EO dynamics v0, the EO flow model, the scenario engine, the dead `--eo-forecast` path and two duplicate
   scripts. Research docs: `docs/research/README.md` summary, superseded notes in `archive/`, EO patterns note added.
   Queue pruned to Ship v0.3, CLI 5, EO1b (wire the re-pick into `--eo`), EO1c, RP1.
+- 2026-10-06, EO1b: `fplrank solve --eo` (AE64, E64, elite, top1000, top10k) now forecasts next-GW EO by re-picking
+  each manager's chip-free latest squad on his next-GW xP, with the AE64/E64 armband herded onto the consensus
+  captain (managers who don't own him buy him). GW2-5 EO error: AE64 7.3 (herding neutral), E64 5.8 to 5.2;
+  persistence was 11.6 / 8.5. Falls back to the repeated chip-free EO without picks or xP. `eo-blend.md` updated.

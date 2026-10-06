@@ -202,13 +202,47 @@ def score_plan(solution: dict, projections: pd.DataFrame, eo: pd.Series, hit_cos
 # used by `fplrank solve` (cli.py)
 
 
-def pick_eo(group: str, bootstrap: dict, next_gw: int) -> tuple[pd.Series | pd.DataFrame, str]:
-    """EO for `group` (a collector group, or 'solio') and a one-line description of it."""
+def repick_eo(group: str, next_gw: int, xp: pd.Series, collected_dir=COLLECTED_DIR) -> tuple[pd.Series, int]:
+    """GW `next_gw` EO forecast for `group` from the collector's picks, as fpl_id -> EO, and the GW of the picks.
+
+    The method `docs/research/eo-blend.md` found best: each manager's latest squad with chips taken out, XI and
+    captain re-picked on `xp` (fpl_id -> next-GW xP) with no transfers, and for AE64/E64 the armband herded onto
+    the consensus captain (`model.eo_blend.herd_captains`). `elite` is the `group_weights` mix of its groups.
+    """
+    from fplrank.model import eo_blend
+
+    picks = pd.read_parquet(collected_dir / "picks.parquet")
+    members = pd.read_parquet(collected_dir / "members.parquet")
+    parts, gws = [], []
+    for g, w in group_weights(group).items():
+        p = picks[picks["entry_id"].isin(members.loc[members["set"] == g, "entry_id"])]
+        if p.empty or p["gw"].min() >= next_gw:
+            raise ValueError(f"No collected picks for {g!r} before GW{next_gw}")
+        eo, last = eo_blend.next_gw_eo(p, next_gw, xp, eo_blend.HERD_CONC.get(g))
+        parts.append(eo * w)
+        gws.append(last)
+    return pd.concat(parts, axis=1).fillna(0.0).sum(axis=1).rename("eo"), min(gws)
+
+
+def pick_eo(group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame | None = None) -> tuple[pd.Series | pd.DataFrame, str]:
+    """EO for `group` (a collector group, or 'solio') and a one-line description of it.
+
+    With `projections` (his, as read) holding next-GW xP and the collector's picks on disk, a collector group's
+    EO is `repick_eo`'s forecast; otherwise its latest chip-free EO, repeated (`load_eo`).
+    """
     if group == "solio":
         eo = load_solio_eo(bootstrap)
         first = eo_for(eo, next_gw)
         players = int((first > 0).sum())
         return eo, f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {players} players, total {first.sum():.1f})"
+    col = f"{next_gw}_Pts"
+    if projections is not None and col in projections:
+        try:
+            eo, eo_gw = repick_eo(group, next_gw, projections.set_index("ID")[col].fillna(0.0))
+        except (FileNotFoundError, ValueError) as e:
+            print(f"EO re-pick not possible ({e}); using the collected EO, repeated")
+        else:
+            return eo, f"{group} GW{eo_gw} squads re-picked on GW{next_gw} xP ({len(eo)} players, total {eo.sum():.1f})"
     eo, eo_gw = load_eo(group, next_gw - 1)
     return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
 

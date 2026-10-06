@@ -296,9 +296,49 @@ Needs `data/` on Alex's PC and the naive-field outputs:
 Outputs (git-ignored) in `data/derived/eo_blend/`: `blend_table.csv` (every group × GW × manager subset ×
 forecast), `weights.csv`, `surges.csv`, `captains.csv`, `bootstrap.csv`, `n_players.csv`, `mip_gaps.csv`.
 
+## Herded captaincy, and what `--eo` uses (EO1b, 2026-10-06)
+
+`fplrank solve --eo AE64|E64|elite|top1000|top10k` now forecasts next-GW EO as (b): each manager's latest squad
+with chips taken out (a), XI and captain re-picked on his next-GW xP, no transfers (`opt.ownership.repick_eo`,
+`model.eo_blend.next_gw_eo`). `elite` is still the `group_weights` mix (`LIVE_WEIGHT` unchanged at 0). Without
+collected picks or a next-GW xP column it falls back to last GW's chip-free EO, repeated, and says so.
+
+For AE64 and E64 the armband is also **herded** (`herd_captains`), because check 6 shows the elite concentrate it
+harder than "everyone captains their own highest xP". The rule, set from 2025-26 (`eo-patterns-2025-26.md` §5)
+before scoring 2026-27:
+
+- Captain candidates: players in at least a quarter of the group's re-picked XIs; c1, c2 = the two with the
+  highest xP; q = 1 / (1 + exp(−(xP1 − xP2) / 0.3)), so the armband splits only when the two are close (a
+  0.5-point lead gives c1 84%, 1 point 97%).
+- Every manager's armband goes conc × q to c1, conc × (1 − q) to c2 and 1 − conc to their own re-picked captain,
+  with conc the 2025-26 median top-captain share: 0.97 AE64, 0.91 E64.
+- A manager who doesn't start c1 (or c2) buys him with that probability, in place of their lowest-xP starter in
+  his position. Without this, herding can't help: E64's GW3 Haaland and GW4 Palmer were in only 50% and 44% of the
+  re-picked XIs but captained by 100% and 95%, so the gap is buy-ins, not the choice among owned players. A first
+  version that only moved the armband among owners changed nothing (AE64 7.4, E64 5.8).
+
+Top 1k and 10k are not herded (their top captain had 41-95% this season).
+
+Pass criterion, written before scoring: not worse than (b) in either group, better in at least one. Same fixed
+player sets as above, all managers, GW2-5:
+
+| | EO error | summed | xP-weighted | ownership | top captain right |
+|---|---|---|---|---|---|
+| AE64 (b) re-pick | 7.30 | 699 | 10.2 | 7.3 | 3 of 4 |
+| AE64 (b) herded | 7.33 | 701 | 10.3 | 7.4 | 3 of 4 |
+| E64 (b) re-pick | 5.83 | 637 | 8.4 | 4.8 | 3 of 4 |
+| E64 (b) herded | **5.15** | **560** | **6.9** | 5.0 | 4 of 4 |
+
+By week (EO error): AE64 3.2 / 16.3 / 4.4 / 5.4 against 3.2 / 16.2 / 5.0 / 4.8; E64 3.4 / 8.2 / 5.2 / 3.9 against
+3.4 / 9.7 / 6.4 / 3.9. Bootstrap gain over (b) (manager resampling, 90%): AE64 −0.5% (−2% to +1%), E64 +11%
+(+10% to +13%). So it passes, narrowly in AE64: E64 gains in the weeks it backed the right consensus (GW3
+Haaland, GW4 Palmer), AE64 loses in GW5, where herding put Haaland at 99% and the real share was 75%. Top captain
+share, herded vs actual: AE64 97/98, 59 (Isak; actual Haaland 97), 88/98, 99/75; E64 91/89, 95/100, 84/95 (now
+Palmer, the re-pick had João Pedro), 98/91. The stale projection file still picks the wrong AE64 GW3 captain,
+which no captain rule can fix. τ and conc were not tuned on these weeks.
+
 ## Next
 
-- Use (a) + (b) as the next-GW EO for `--eo` (seconds, no solver), with real chip EO left out of the fit.
-- Improve (b)'s captaincy: the elite concentrate more than independent highest-xP picks (check 6).
+- Score the herded re-pick on GW6 (fresh file) and again at ~GW10 (EO1c); refit τ only with more weeks.
 - Keep the per-manager solve (or the clustered version) for ownership moves; score GW6 with the fresh file after
   Saturday's deadline, the second clean week.

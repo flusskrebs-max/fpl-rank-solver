@@ -183,3 +183,22 @@ def test_rank_goal_table_moves_a_stale_line_on_by_its_pace(monkeypatch):
     assert "line 320 after GW5 (GW3 line moved on 2 GW at 60 a GW)" in text
     assert "gap to close 20" in text
     assert table["p"].notna().all()  # one season of cut-offs (sd NaN) still gives a probability
+
+
+def test_repick_eo_mixes_the_elite_groups_on_next_gw_xp(tmp_path):
+    pos = [1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4]
+    rows = [
+        (entry, 5, pid, i, int(i == 3), pos[i - 1], None)
+        for entry, ids in ((1, range(1, 16)), (2, range(101, 116)))
+        for i, pid in enumerate(ids, 1)
+    ]
+    cols = ["entry_id", "gw", "fpl_id", "position", "is_captain", "element_type", "active_chip"]
+    pd.DataFrame(rows, columns=cols).to_parquet(tmp_path / "picks.parquet")
+    pd.DataFrame({"set": ["AE64", "E64"], "entry_id": [1, 2]}).to_parquet(tmp_path / "members.parquet")
+    xp = pd.Series(1.0, index=[*range(1, 16), *range(101, 116)])
+    xp[[13, 113]] = 8.0
+    eo, gw = ow.repick_eo("elite", 6, xp, collected_dir=tmp_path)
+    assert gw == 5 and eo.sum() == pytest.approx(12)  # each group's one manager, half weight each
+    assert eo[13] == pytest.approx(1.0) and eo[113] == pytest.approx(1.0)  # captain x2, x 0.5
+    with pytest.raises(ValueError):
+        ow.repick_eo("elite", 5, xp, collected_dir=tmp_path)  # no picks before GW5
