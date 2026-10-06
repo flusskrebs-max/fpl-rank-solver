@@ -78,4 +78,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
   (`--lam-all-gws` keeps the old behaviour).
 - 2026-10-06, R1 v1: `uv run python -m fplrank.weekly --team <id> --target 10000` writes `reports/GW{n}.md` (git-ignored):
   recommended plan, P(target) vs the EV plan, EV cost, two nearest alternatives, full sweep. Loud warning on `ep_next`.
-  S1 CLI helpers shared (`pick_projections`, `pick_eo`, `rank_goal_table`). Not yet run live.
+  S1 CLI helpers shared (`pick_projections`, `pick_eo`, `rank_goal_table`). `run(Inputs, mode)` harness; `--mode simulate`
+  reserved for R2 (upstream's `randomized` noise, plan in the brief). Not yet run live.

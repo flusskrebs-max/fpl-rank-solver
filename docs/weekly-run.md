@@ -34,7 +34,8 @@ The quickest way is the weekly report, which runs everything below and writes `r
 uv run python -m fplrank.weekly --team <your team id> --target 10000
 ```
 
-It uses `--eo AE64` unless you add `--eo solio` (or another group). The report gives the recommended
+It uses `--eo AE64` (last GW's collected EO) unless you add `--eo-forecast` (the model's guess at the deadline EO)
+or `--eo solio`. Your points and rank come from the FPL API; `--points`/`--rank` override them. The report gives the recommended
 moves, captain and XI, P(top 10,000) against the EV plan, the EV cost, two alternatives and the full
 sweep. If it starts with a WARNING about `ep_next`, step 2 was missed: don't use that plan.
 

@@ -336,10 +336,12 @@ def drift_group(eo_group: str, override: str | None = None) -> str:
     return override or (eo_group if eo_group in ("AE64", "E64") else "AE64")
 
 
-def current_points(team_id: int) -> int:
+def current_standing(team_id: int) -> tuple[int, int | None]:
+    """Our total points and overall rank after the last finished GW (live API)."""
     from fplrank.data.fpl_api import FplApi
 
-    return FplApi().entry_history(team_id)["current"][-1]["total_points"]
+    last = FplApi().entry_history(team_id)["current"][-1]
+    return last["total_points"], last.get("overall_rank")
 
 
 def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=0.3) -> tuple[pd.DataFrame, str]:
@@ -368,7 +370,7 @@ def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, gr
 def _rank_goal(args, solutions, projections, eo, next_gw):
     from fplrank.opt import rank_goal
 
-    points = args.points if args.points is not None else current_points(args.team)
+    points = args.points if args.points is not None else current_standing(args.team)[0]
     group = drift_group(args.eo, args.drift_group)
     table, text = rank_goal_table(solutions, projections, eo, next_gw, args.target_rank, points, group, args.kappa)
     print()

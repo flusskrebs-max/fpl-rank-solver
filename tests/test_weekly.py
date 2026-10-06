@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from fplrank import weekly
-from fplrank.opt import ownership as ow
 
 
 def _sol(captain_id, ev, buy="-", sell="-"):
@@ -55,6 +54,19 @@ def test_render_with_target_shows_choice_ev_plan_and_distinct_alternatives():
     assert "| 0 |" not in alts
 
 
+def _inputs(**kw):
+    return weekly.Inputs(gw=6, team_id=1, my_data={}, bootstrap={}, fixtures=[], projections=pd.DataFrame(), eo=pd.Series(), **kw)
+
+
+def test_run_checks_mode_and_goal_before_solving():
+    with pytest.raises(NotImplementedError, match="R2"):
+        weekly.run(_inputs(), mode="simulate")
+    with pytest.raises(ValueError, match="mode"):
+        weekly.run(_inputs(), mode="best")
+    with pytest.raises(ValueError, match="points"):
+        weekly.run(_inputs(target=10000))
+
+
 @pytest.mark.slow
 def test_weekly_report_offline_on_a_real_team():
     from test_opt_ownership import _gw6
@@ -64,6 +76,8 @@ def test_weekly_report_offline_on_a_real_team():
     my_data, bootstrap, fixtures = _gw6()
     proj = from_ep_next(bootstrap, fixtures, horizon=3)
     eo = pd.Series({e["id"]: 1.5 for e in bootstrap["elements"][:40]})
-    table, sols = ow.sweep(my_data, proj, eo, bootstrap, fixtures, (0.0, 0.2), {"horizon": 3, "secs": 120, "gap": 0})
-    text = weekly.render(6, 1, "Projections: ep_next.", table, sols)
-    assert "## Recommended: λ = 0 (EV plan)" in text and text.count("XI:") == 1
+    inputs = weekly.Inputs(6, 1, my_data, bootstrap, fixtures, proj, eo, points=400, rank=12345, sources="EO: test.", ep_next=True)
+    text = weekly.run(inputs, horizon=3, secs=120, lams=(0.0, 0.2), options={"gap": 0})
+    assert text.count("XI:") == 1 and "## Recommended: λ = 0 (EV plan)" in text
+    assert "Now: 400 points, overall rank 12,345; no rank goal. EO: test. Horizon 3 GWs, λ on GW6 only." in text
+    assert text.splitlines()[2].startswith("Made") and "> **WARNING: no Solio file" in text
