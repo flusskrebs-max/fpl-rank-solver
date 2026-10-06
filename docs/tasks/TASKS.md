@@ -29,7 +29,7 @@ The plan and release order are in `docs/roadmap.md`; finished-task notes are in 
 | S2a | Gap: T_X now + drift of the line against the EO group this season; `target_line` kept as the indicative absolute line (report only) | S2 | DONE (PR #17) |
 | D1 | Loader for FPL-Core-Insights `playerstats.csv` (2025-26, 2026-27): per-GW `ep_next`, ownership, transfers | D1 | IN REVIEW |
 | S2b | Variance table v(xP) by position × within-source xP quantile (not raw xP) from 2023-24, 2024-25 and 2025-26 (D1's `ep_next` as xP) | S2 | IN REVIEW |
-| V1 | Realised-spread check: per-GW realised Δ = Σ (m − EO) × pts for top-1000 and Elite 64 managers this season vs S2's σ for the same squads; within ~20% → s = 1, else set s to match. Also outputs drift and σ²_base | V1 | TODO |
+| V1 | Realised-spread check: per-GW realised Δ = Σ (m − EO) × pts for top-1000 and Elite 64 managers this season vs S2's σ for the same squads; within ~20% → s = 1, else set s to match. Also outputs drift and σ²_base | V1 | IN REVIEW |
 | S2c | `choose_lambda` + one-line report; CLI takes target rank and our points or rank | S2 | IN REVIEW (s = 1 until V1) |
 
 ## v0.3 Better EO
