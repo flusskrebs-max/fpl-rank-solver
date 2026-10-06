@@ -63,3 +63,4 @@ One line per finished task or decision from now on; detail belongs in the PR and
   so the plan captains him); fine for tests and history, not for real decisions.
 - 2026-10-06, S1d: `--eo solio` reads Solio's per-GW EO forecast (matched to FPL ids by name + team) and S1 now takes
   a different EO per GW. Live GW6 sweep on the rank-1 team: EV plan for λ -0.1..0.1, Haaland captain for λ ≥ 0.2 (cost 3.4).
+- 2026-10-06, W1: `docs/weekly-run.md`, the pre-deadline steps on Alex's PC.

@@ -66,6 +66,7 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   2025-26 against an empirical benchmark (`docs/research/scenario-calibration.md`).
 - `docs/tasks/TASKS.md` (the queue, grouped by release), `docs/tasks/log.md` (dated notes), `docs/tasks/briefs/`
   (open briefs); `docs/briefs/` (finished briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
+- `docs/weekly-run.md`: Alex's pre-deadline steps (update, register Solio files, run S1).
 - `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/ownership.py`: S1 ownership-weighted solve. `adjust_projections(proj, eo, lam)`,
