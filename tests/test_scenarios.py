@@ -62,9 +62,10 @@ def test_team_mates_rise_together_and_defenders_share_clean_sheets():
     proj, fixtures = _league()
     gw1 = proj[proj["gw"] == 1]
     players = sc.player_index(gw1)
-    sl = sc._gw_slots(gw1, fixtures[fixtures["event"] == 1], players)
+    rules, params = sc.RULES["2026-27"], sc.DEFAULT_PARAMS
+    sl = sc._gw_slots(gw1, fixtures[fixtures["event"] == 1], players, rules, params)
     rng = np.random.default_rng(3)
-    pts, parts = sc._simulate_slots(sl, sc._fit_rates(sl, rng), 20000, rng, detail=True)
+    pts, parts = sc._simulate_slots(sl, sc._fit_rates(sl, rng, rules, params), 20000, rng, rules, params, detail=True)
     team = gw1.set_index("fpl_id")["team_id"].reindex(players).to_numpy()[sl.player]
     pos = sl.pos
     attackers = np.flatnonzero((team == 1) & (pos >= 2))
@@ -82,7 +83,8 @@ def test_minutes_states_are_probabilities():
     p0, p1, p2 = sc.minutes_states([0, 10, 45, 70, 90, 120])
     np.testing.assert_allclose(p0 + p1 + p2, 1)
     assert (np.array([p0, p1, p2]) >= 0).all()
-    assert p0[0] == 1 and p2[4] == 1
+    assert p0[0] == 1  # xMins 0 = out
+    assert (np.diff(p2) >= 0).all() and 0.85 < p2[4] < 1  # even nailed starters miss some games (2023-24 table)
 
 
 def test_with_team_ids_matches_name_variants():
@@ -95,3 +97,15 @@ def test_with_team_ids_matches_name_variants():
     assert sc.with_team_ids(proj, teams)["team_id"].tolist() == [1, 2, 3, 3]
     with pytest.raises(ValueError):
         sc.with_team_ids(pd.DataFrame({"team": ["Atlantis"]}), teams)
+
+
+def test_calibration_scores():
+    from fplrank.sim.calibration import _scores
+
+    sure = np.full((1000, 1), 5.0)
+    log_hit, crps_hit = _scores(sure, np.array([5.0]))
+    log_miss, crps_miss = _scores(sure, np.array([9.0]))
+    assert crps_hit[0] == pytest.approx(0) and crps_miss[0] == pytest.approx(4)
+    assert log_hit[0] < 0.1 < log_miss[0]
+    spread = np.random.default_rng(0).integers(0, 11, (4000, 1)).astype(float)
+    assert _scores(spread, np.array([5.0]))[1][0] < crps_miss[0]  # a wide forecast beats a confident wrong one
