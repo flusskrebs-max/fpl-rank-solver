@@ -64,10 +64,39 @@ def season_inputs(season: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     pg = pg.reset_index().rename(columns={"element": "fpl_id", "round": "gw"}).sort_values(["fpl_id", "gw"])
     pg["pos"] = pg["pos"].map(POS)
     per_fixture = pg["minutes"] / pg["n_fix"]
-    recent = per_fixture.groupby(pg["fpl_id"]).transform(lambda m: m.shift(1).rolling(4, min_periods=1).mean())
-    pg["xmins"] = recent.fillna(0) * pg["n_fix"]
+    pg["recent"] = per_fixture.groupby(pg["fpl_id"]).transform(lambda m: m.shift(1).rolling(4, min_periods=1).mean()).fillna(0)
     pg["price"] = pg["value"] / 10
+    pg["xmins"] = projected_minutes(pg, season) * pg["n_fix"]
     return pg, fixtures
+
+
+# Projected minutes for calibration. vaastav has no projected minutes, and recent minutes alone miss team
+# news (players with xP 0 are flagged out and play only 7-21% of the time). So xMins = average minutes per
+# fixture in the TRAINING season for the same keeper/outfield x xP band x recent-minutes band: information
+# available before the deadline, like a projection's xMins. Fitted on 2023-24 only and reused unchanged.
+MIN_XP_BANDS = [-0.01, 0, 0.5, 1, 1.5, 2, 3, 99]
+MIN_RECENT_BANDS = [-0.01, 0, 30, 60, 80, 91]
+_MINUTES_MODEL: dict = {}
+
+
+def _minutes_keys(pg: pd.DataFrame) -> pd.MultiIndex:
+    xp = pd.cut(pg["xpts"] / pg["n_fix"], MIN_XP_BANDS, labels=False)
+    rec = pd.cut(pg["recent"], MIN_RECENT_BANDS, labels=False)
+    return pd.MultiIndex.from_arrays([pg["pos"].eq("G"), xp, rec], names=["keeper", "xp", "recent"])
+
+
+def projected_minutes(pg: pd.DataFrame, season: str) -> pd.Series:
+    """Expected minutes per fixture for each player-GW, from the training season's table (see above)."""
+    if "table" not in _MINUTES_MODEL:
+        train = pg if season == TRAIN else season_inputs(TRAIN)[0]
+        train = train[train["gw"].isin(gws_with_xp(train)) & (train["n_fix"] == 1)]
+        per_fixture = pd.Series(train["minutes"].to_numpy(float), index=_minutes_keys(train))
+        _MINUTES_MODEL["table"] = per_fixture.groupby(level=[0, 1, 2]).mean()
+    table = _MINUTES_MODEL["table"]
+    keys = _minutes_keys(pg)
+    out = pd.Series(table.reindex(keys).to_numpy(), index=pg.index)
+    # unseen cells: the recent minutes themselves
+    return out.fillna(pg["recent"])
 
 
 def gws_with_xp(pg: pd.DataFrame, first: int = 5) -> list[int]:
@@ -103,7 +132,7 @@ def simulate_season(pg, fixtures, gws, rules: str, params: Params = DEFAULT_PARA
     """Engine: per player-GW actual points, simulated frequencies and mean, scores, and `keep` raw draws."""
     out = []
     for gw in gws:
-        proj = pg[(pg["gw"] == gw) & (pg["xmins"] > 0)]
+        proj = pg[(pg["gw"] == gw) & (pg["recent"] > 0)]
         if not proj.empty:
             sim = simulate(proj, fixtures, S=S, H=1, seed=int(gw), rules=rules, params=params)[:, 0, :]
             out.append(_collect(proj, sim.astype(float), keep))
@@ -153,7 +182,7 @@ class Empirical:
 
 
 def fit_empirical(pg: pd.DataFrame, gws) -> Empirical:
-    train = pg[pg["gw"].isin(gws) & (pg["xmins"] > 0) & (pg["n_fix"] == 1)]
+    train = pg[pg["gw"].isin(gws) & (pg["recent"] > 0) & (pg["n_fix"] == 1)]
     emp = Empirical(pools={}, rho={"att": 0.0, "def": 0.0})
     keys = emp.keys(train)
     pts = train["pts"].to_numpy(float)
@@ -174,7 +203,7 @@ def fit_empirical(pg: pd.DataFrame, gws) -> Empirical:
 def empirical_season(emp: Empirical, pg, gws, S: int = 2000, keep: int = 20) -> pd.DataFrame:  # noqa: N803
     out = []
     for gw in gws:
-        proj = pg[(pg["gw"] == gw) & (pg["xmins"] > 0)].sort_values("fpl_id")
+        proj = pg[(pg["gw"] == gw) & (pg["recent"] > 0)].sort_values("fpl_id")
         if not proj.empty:
             sim = np.rint(emp.sample(proj, S, np.random.default_rng(int(gw))))
             out.append(_collect(proj, sim, keep))

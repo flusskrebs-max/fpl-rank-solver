@@ -60,17 +60,18 @@ RULES = {
 class Params:
     """Every tunable constant, with where it was fitted (vaastav merged_gw unless said otherwise)."""
 
-    # Minutes: P(0) and P(1-59) by xMins per fixture, from xMins = average minutes per fixture over the
-    # previous 4 GWs vs minutes played (2023-24, GW5+, single fixtures). xMins 0 means "out": P(0) = 1.
-    minutes_table: tuple = (  # outfield players
-        (5, 20, 40, 60, 75, 82.5, 86.5, 89.5),  # xMins (band midpoints)
-        (0.571, 0.427, 0.327, 0.203, 0.137, 0.121, 0.078, 0.054),  # P(0)
-        (0.331, 0.310, 0.282, 0.188, 0.148, 0.105, 0.093, 0.057),  # P(1-59)
+    # Minutes: P(0) and P(1-59) by xMins (expected minutes per fixture). Fitted on 2023-24 against the
+    # calibration's projected minutes (training-season average minutes for the same keeper/outfield x xP band
+    # x recent-minutes band; see fplrank.sim.calibration.projected_minutes). xMins 0 means "out": P(0) = 1.
+    minutes_table: tuple = (  # outfield players; the 90 point is judgement (only 32 cases above 85)
+        (4.6, 19.1, 38.7, 61.5, 76.2, 82.5, 90),  # xMins
+        (0.859, 0.498, 0.228, 0.117, 0.050, 0.024, 0.020),  # P(0)
+        (0.100, 0.350, 0.418, 0.231, 0.102, 0.055, 0.030),  # P(1-59)
     )
-    keeper_minutes_table: tuple = (  # keepers: almost never part of a game; backups rarely play at all
-        (5, 20, 40, 60, 75, 89.5),
-        (0.556, 0.636, 0.506, 0.357, 0.360, 0.054),
-        (0.111, 0.028, 0.023, 0.020, 0.000, 0.015),
+    keeper_minutes_table: tuple = (  # keepers: almost never part of a game
+        (18.4, 43.4, 62.8, 74.3, 83.5, 87.9),
+        (0.806, 0.535, 0.291, 0.174, 0.056, 0.017),
+        (0.028, 0.028, 0.047, 0.000, 0.032, 0.009),
     )
     mins_sub: float = 21.9  # average minutes in 1-59 appearances (2023-24)
     mins_full: float = 85.5  # average minutes in 60+ appearances (2023-24)
@@ -85,6 +86,7 @@ class Params:
     lambda_range: tuple = (0.6, 3.0)  # expected team goals per match (judgement)
     max_goal_share: float = 0.6  # of his team's goals (brief: top players take 50-60% of involvements)
     max_assist_share: float = 0.5
+    keeper_max_assist_share: float = 0.01  # keepers assist ~0.3% of games (2023-24): not a lever for their projection
     shared_weight: float = 0.7  # tuned on 2023-24
     bps_noise: float = 6.0  # sd of the BPS-like score's noise; tuned on 2023-24
     fitted: dict = field(default_factory=dict, compare=False)  # notes from the latest tuning run
@@ -179,7 +181,8 @@ def _simulate_slots(sl: Slots, rate, s: int, rng: np.random.Generator, rules: Ru
     apg = np.array(params.assist_per_goal)
     goals = rng.binomial(team_goals(), np.clip(rate * ATTACK_GOAL_SHARE[pos] * per_team_goal, 0, params.max_goal_share))
     assist_rate = rate * np.where(pos == 0, 1.0, apg[pos])
-    assists = rng.binomial(team_goals(), np.clip(assist_rate * per_team_goal, 0, params.max_assist_share))
+    assist_cap = np.where(pos == 0, params.keeper_max_assist_share, params.max_assist_share)
+    assists = rng.binomial(team_goals(), np.clip(assist_rate * per_team_goal, 0, assist_cap))
     gk_def = GC_APPLIES[pos]
     clean = full & (g_against == 0)
     conceded = np.where(full & gk_def, g_against // 2, 0)
@@ -241,7 +244,8 @@ def _rate_cap(sl: Slots, params: Params) -> np.ndarray:
     full_share = params.mins_full / 90
     apg = np.where(sl.pos == 0, 1.0, np.array(params.assist_per_goal)[sl.pos])
     goal_cap = np.where(sl.pos == 0, np.inf, params.max_goal_share * lam_for / full_share)
-    return np.minimum(goal_cap, params.max_assist_share * lam_for / (apg * full_share))
+    assist_share = np.where(sl.pos == 0, params.keeper_max_assist_share, params.max_assist_share)
+    return np.minimum(goal_cap, assist_share * lam_for / (apg * full_share))
 
 
 def _fit_rates(sl: Slots, rng: np.random.Generator, rules: Rules, params: Params, s: int = 4000, iterations: int = 6) -> np.ndarray:
