@@ -127,3 +127,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   to the real 8-GW move); captain split evened out further ahead; next GW unchanged. `--eo_drift false` = old.
   Team 157924, top 10k, elite: same λ (-0.05) and same plan, P 38% → 29% (the field's upgrades cut our projected
   edge from 14.3 to 8.7 over 8 GWs). `docs/research/eo-horizon.md`.
+- 2026-10-06, CLI 5: `uv run fplrank page` opens a local Streamlit page (`src/fplrank/ui/`) that fills in the
+  `fplrank solve` flags, runs it in its own process and shows the output, with P by λ as a bar chart when there is a
+  target. No modelling; last choices kept in `data/ui_settings.json`. Streamlit added as a dependency.

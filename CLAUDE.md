@@ -50,6 +50,7 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 - `src/fplrank/cli.py`: `fplrank solve`. His `solve_regular` with his flags; `--eo/--target/--lam` scale his projections
   on read (next GW only), solve per λ, pick the best P(target) and print his output for that plan; `--sims N` runs
   his simulations + sensitivity summary at that λ. `src/fplrank/upstream.py`: imports/patches his code.
+- `src/fplrank/ui/`: `uv run fplrank page`, a Streamlit page that only fills in `fplrank solve` flags, runs it and shows the output.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
   season files),
   `elite.py` (elite-group EO, meta tables and 2025-26 squad ownership from `datasets/elite_ownership/`;

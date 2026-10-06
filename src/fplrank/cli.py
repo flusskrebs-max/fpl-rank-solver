@@ -22,10 +22,12 @@ import argparse
 import contextlib
 import io
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
@@ -261,8 +263,14 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     sys.stdout.reconfigure(encoding="utf-8")  # player names and λ on the Windows console
+    if argv and argv[0] == "page":  # the Streamlit page that fills in these flags (fplrank.ui)
+        page = Path(__file__).parent / "ui" / "page.py"
+        return subprocess.call([sys.executable, "-m", "streamlit", "run", str(page), *argv[1:]])
     if not argv or argv[0] != "solve":
-        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--kappa κ]", end="")
+        print(
+            "usage: fplrank page | fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--kappa κ]",
+            end="",
+        )
         print(" [--eo_decay d] [--sims N]")
         return 2
     return solve(argv[1:])
