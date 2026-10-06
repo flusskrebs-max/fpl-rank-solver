@@ -68,6 +68,9 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
 - `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
+- `src/fplrank/opt/ownership.py`: S1 ownership-weighted solve. `adjust_projections(proj, eo, lam)`,
+  `solve_with_ownership(...)`, `sweep(...)` (plans per λ with EV, EV cost, EO held, exposure);
+  CLI `uv run python -m fplrank.opt.ownership --team <id> --eo AE64|E64|top1000 --sweep` (live API).
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
 - `docs/roadmap.md` (phases), `docs/components.md` (what we need), `docs/research/` (thinking),
@@ -82,6 +85,7 @@ uv run ruff check . && uv run ruff format .
 uv run python scripts/smoke_baseline.py
 uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
 uv run python -m fplrank.collect.elite_picks collect [--top N]     # FPL API: Alex's PC only
+uv run python -m fplrank.opt.ownership --team <id> --eo AE64 --sweep  # S1 plans per λ (live API)
 ```
 
 ## Conventions

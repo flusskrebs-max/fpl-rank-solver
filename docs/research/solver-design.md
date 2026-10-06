@@ -88,6 +88,9 @@ Say you own player P at 15% elite EO, he hauls, and next week elite EO jumps to 
   each scenario path's outcomes. Error bars come from sampling its parameters.
 - **[C] Candidate generator:** reuses the upstream MILP. The λ·EO·xP term is exactly the community
   "risk position" knob, so we get its full range for free. Typically 20–60 candidates per week.
+  As built in S1 (`opt/ownership.py`, 2026-10-06) the term is centred at EO = 1:
+  xP' = xP·(1 + λ·(EO − 1)). A player the field owns exactly once is neutral for rank, and centring
+  keeps adjusted xP on the raw scale so λ changes which players are picked, not the value of hits.
 - **[D] Evaluator:** for each candidate, simulate its first-week action and then a default policy for
   the rest of the horizon (re-solve with λ chosen by the value function: a "rollout"). At the end of
   the horizon, convert the gap to a probability with V.

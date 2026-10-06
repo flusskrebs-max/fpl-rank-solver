@@ -16,7 +16,7 @@ Plan agreed with Alex at the 2026-10-06 stock take: three core products, simple 
 |---|---|---|---|
 | 1 | Tidy-up: merge PRs #10-#11, move the handover, briefs and this queue into the repo, retire the inbox | (none) | DONE (PR #12) |
 | 2 | Points simulator: out-of-sample calibration vs an empirical benchmark | B07b | DONE (PR #11; criteria not met, see note) |
-| 4 | **Ownership-weighted solver**: EV solve with xP adjusted by λ x EO; λ sweep with EV cost | S1 | TODO |
+| 4 | **Ownership-weighted solver**: EV solve with xP adjusted by λ x EO; λ sweep with EV cost | S1 | IN REVIEW (PR #14) |
 | 5 | **λ from the rank goal**: normal approximation of the relative score; choose λ from gap, target rank, GWs left | S2 | TODO |
 | 3 | **Elite EO forecast**: refit on 2025-26 and forecast several GWs ahead | B04b | TODO |
 
@@ -63,3 +63,14 @@ B01, B01b, B02, B03 (PRs #1-4); B03b, B04, B05, B06, B07 (PRs #5-9); B05 follow-
 - 2026-10-06, stock take with Alex: simplified the plan to three core products (queue above); new briefs S1
   and S2; B04b gains a multi-GW step. The collector now reads the AE64 (league 1291919) and E64 (league
   38543) members each run (config `leagues`), so their EO is collected exactly from now on.
+- 2026-10-06, S1: merged PR #13. Built `src/fplrank/opt/ownership.py`: xP' = xP x (1 + λ(EO − 1)) (centred
+  at EO = 1, see solver-design §4 [C]), `solve_with_ownership`, `sweep` (dedupes plans by this GW's XI,
+  bench, captain and moves; EV cost vs λ = 0), and a CLI for any team id
+  (`uv run python -m fplrank.opt.ownership --team <id> --eo AE64|E64|top1000 --sweep`). EO = latest GW of the
+  collector's `eo.parquet`, falling back to the Elite 64 graphics for AE64/E64; unlisted players are 0 and
+  the same EO is used for every GW of the horizon (B04b will replace this). Tests cover the brief's three
+  checks with real solves on 2025-26 data. Live check on the rank-1 team, GW6, horizon 4, top1000 GW5 EO:
+  λ −0.3..−0.2 sells Haaland (EV cost 6.7), λ −0.1..0.05 is the EV plan, λ 0.1 captains Haaland (cost 0.8),
+  λ 0.2..0.3 sells Szoboszlai for Groß (cost 3.4); exposure falls from 89 to 67 across the range.
+  Caveat: with a 60 s limit per solve, EV figures can be off by ~1-2 points (a λ ≠ 0 plan once scored
+  above λ = 0 over the horizon), so small EV costs are noise.

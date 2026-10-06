@@ -1,0 +1,150 @@
+"""S1 ownership-weighted solve: projection adjustment, plan scoring, and real solves on 2025-26 data."""
+
+from itertools import pairwise
+
+import pandas as pd
+import pytest
+
+from fplrank.opt import ownership as ow
+
+
+def _proj():
+    return pd.DataFrame(
+        {"ID": [1, 2, 3], "Pos": ["M", "M", "F"], "6_Pts": [6.0, 4.0, 2.0], "7_Pts": [5.0, 3.0, 1.0], "6_xMins": [90, 90, 90]}
+    )
+
+
+def test_adjust_is_identity_at_zero_and_neutral_at_eo_one():
+    proj, eo = _proj(), pd.Series({1: 1.0, 2: 1.6})
+    pd.testing.assert_frame_equal(ow.adjust_projections(proj, eo, 0.0), proj)
+    adj = ow.adjust_projections(proj, eo, 0.2)
+    assert list(adj["6_Pts"]) == pytest.approx([6.0, 4.0 * 1.12, 2.0 * 0.8])  # EO 1, 1.6, unlisted (0)
+    assert list(adj["7_Pts"]) == pytest.approx([5.0, 3.0 * 1.12, 1.0 * 0.8])
+    assert list(adj["6_xMins"]) == [90, 90, 90]
+
+
+def test_load_eo_takes_latest_gw_and_prefers_collector(tmp_path):
+    pd.DataFrame(
+        {
+            "season": "2026-27",
+            "gw": [4, 5, 5, 5],
+            "group": ["AE64", "AE64", "AE64", "top1000"],
+            "fpl_id": [1, 1, 2, 1],
+            "eo": [0.5, 0.7, 1.2, 0.1],
+            "n_managers": 64,
+        }
+    ).to_parquet(tmp_path / "eo.parquet")
+    eo, gw = ow.load_eo("AE64", 5, collected_dir=tmp_path)
+    assert gw == 5 and eo[1] == 0.7 and eo[2] == 1.2
+    eo, gw = ow.load_eo("top1000", collected_dir=tmp_path)
+    assert gw == 5 and dict(eo) == {1: 0.1}
+    with pytest.raises(ValueError):
+        ow.load_eo("top1000", 3, collected_dir=tmp_path)
+
+
+def _solution(captain_id, buy="-"):
+    rows = []
+    for w in (6, 7):
+        for pid in (1, 2, 3):
+            cap = int(pid == captain_id)
+            rows.append(
+                {
+                    "id": pid,
+                    "week": w,
+                    "name": f"p{pid}",
+                    "lineup": int(pid != 3),
+                    "bench": 0 if pid == 3 else -1,
+                    "captain": cap,
+                    "multiplier": (1 + cap) * int(pid != 3),
+                }
+            )
+    return {"picks": pd.DataFrame(rows), "statistics": {5: {"itb": 0}, 6: {"pt": 1}, 7: {"pt": 0}}, "buy": buy, "sell": "-", "chip": "-"}
+
+
+def test_score_plan_uses_raw_xp_and_hits():
+    proj, eo = _proj(), pd.Series({1: 0.5, 2: 1.5})
+    s = ow.score_plan(_solution(captain_id=1), proj, eo)
+    assert s["ev_next"] == pytest.approx(2 * 6 + 4 - 4)
+    assert s["ev"] == pytest.approx(12 + 2 * 5 + 3)
+    assert s["eo_held"] == pytest.approx(2 * 0.5 + 1.5)
+    assert s["exposure"] == pytest.approx(1.5 * 6 + 0.5 * 4)
+    assert s["captain"] == "p1"
+
+
+def test_plan_key_tells_captains_apart():
+    assert ow.plan_key(_solution(1)) == ow.plan_key(_solution(1))
+    assert ow.plan_key(_solution(1)) != ow.plan_key(_solution(2))
+    assert ow.plan_key(_solution(1)) != ow.plan_key(_solution(1, buy="Saka"))
+
+
+# --- real solves (upstream MILP on 2025-26 history) ------------------------------------------
+
+SEASON, GW = "2025-26", 20
+
+
+@pytest.fixture(scope="module")
+def setup():
+    from fplrank.data import historical, offline
+
+    players, teams = historical.players_raw(SEASON), historical.teams(SEASON)
+    fixtures = offline.build_fixtures(historical.fixtures(SEASON))
+    bootstrap = offline.build_bootstrap(players, teams, GW)
+    proj = offline.placeholder_projections(players, teams, fixtures, [GW], games_played=GW - 1)
+    opts = {"preseason": True, "horizon": 1, "use_wc": [GW], "secs": 120, "xmin_lb": 0, "keep_top_ev_percent": 30, "gap": 0}
+    return offline.preseason_team(), proj, bootstrap, fixtures, opts
+
+
+def _xp_weighted_eo(sol, proj, eo):
+    xp = proj.set_index("ID")[f"{GW}_Pts"]
+    rows = sol["picks"][sol["picks"]["week"] == GW]
+    return sum(r.multiplier * xp[r.id] * eo.get(r.id, 0.0) for r in rows.itertuples())
+
+
+@pytest.mark.slow
+@pytest.mark.network
+def test_lambda_zero_is_the_ev_plan(setup):
+    from fplrank.baseline import solve_ev
+
+    my_data, proj, bootstrap, fixtures, opts = setup
+    eo = pd.Series(dict.fromkeys(proj.nlargest(30, f"{GW}_Pts")["ID"], 1.4))
+    ev = solve_ev(my_data, proj, bootstrap, fixtures, opts)[0]
+    s0 = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
+    assert ow.plan_key(s0) == ow.plan_key(ev)
+
+
+@pytest.mark.slow
+@pytest.mark.network
+def test_rising_lambda_trades_ev_for_field_cover(setup):
+    my_data, proj, bootstrap, fixtures, opts = setup
+    # a field that owns some good-but-not-best players heavily
+    ranked = proj.sort_values(f"{GW}_Pts", ascending=False)["ID"].tolist()
+    eo = pd.Series({**dict.fromkeys(ranked[5:25], 1.0), **dict.fromkeys(ranked[25:40], 0.8), ranked[10]: 1.8})
+    sols = [ow.solve_with_ownership(my_data, proj, eo, lam, bootstrap, fixtures, opts) for lam in (0.0, 0.1, 0.2, 0.3)]
+    cover = [_xp_weighted_eo(s, proj, eo) for s in sols]
+    evs = [s["ev"] for s in sols]
+    assert all(b >= a - 1e-6 for a, b in pairwise(cover))
+    assert all(b <= a + 1e-6 for a, b in pairwise(evs))
+    assert cover[-1] > cover[0] and evs[-1] < evs[0]
+
+
+@pytest.mark.slow
+@pytest.mark.network
+def test_captain_flips_to_the_high_eo_player(setup):
+    my_data, proj, bootstrap, fixtures, opts = setup
+    s0 = ow.solve_with_ownership(my_data, proj, pd.Series(dtype=float), 0.0, bootstrap, fixtures, opts)
+    rows = s0["picks"][s0["picks"]["week"] == GW]
+    cap = int(rows.loc[rows["captain"] == 1, "id"].iloc[0])
+    other = int(rows[(rows["lineup"] == 1) & (rows["captain"] == 0)].sort_values("xP")["id"].iloc[-1])
+    proj = proj.copy()
+    cap_xp = proj[f"{GW}_Pts"].max() + 1  # placeholder projections have ties: make the captain clear
+    proj.loc[proj["ID"] == cap, f"{GW}_Pts"] = cap_xp
+    proj.loc[proj["ID"] == other, f"{GW}_Pts"] = cap_xp - 0.2  # slightly worse than our EV captain...
+    eo = pd.Series({cap: 0.3, other: 1.6})  # ...but the field captains him
+
+    def captain(lam):
+        s = ow.solve_with_ownership(my_data, proj, eo, lam, bootstrap, fixtures, opts)
+        r = s["picks"][s["picks"]["week"] == GW]
+        return int(r.loc[r["captain"] == 1, "id"].iloc[0])
+
+    assert captain(0.0) == cap
+    assert captain(0.1) == other
