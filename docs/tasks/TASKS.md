@@ -18,7 +18,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 
 | # | Task | Brief | Status |
 |---|---|---|---|
-| CLEAN | Bug check and spring clean: dead code out, docs consolidated | (none) | IN REVIEW |
+| CLEAN | Bug check and spring clean: dead code out, docs consolidated | (none) | IN REVIEW (PR #41) |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags | (to write) | TODO |
 
