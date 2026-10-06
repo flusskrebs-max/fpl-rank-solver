@@ -89,3 +89,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   projections go in as his `data/fplrank.csv`, his settings files apply, his solutions come back. Our own prep/solve calls removed.
 - 2026-10-06, CLI 2/4: `uv run fplrank solve` = his solve.py (his settings and flags unchanged) plus `--eo`, `--target`, `--lam`:
   his projections are λ-scaled on read, one solve per λ, best P(target) chosen, his output for that plan under a short λ block.
+- 2026-10-06, CLI 4/4: clean-up. Removed what `fplrank solve` covers: `baseline.solve_ev` and `data/offline.py` (our own team and
+  projection inputs), the S1 CLI and `sweep` in `opt/ownership.py`, `weekly.py` (R1, superseded), `opt/toy.py` and their tests.
+  His solver imports moved to `upstream.py`; the λ captain-flip check now runs through `cli.run`. Docs: one way to run it.

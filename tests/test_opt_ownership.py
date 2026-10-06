@@ -1,8 +1,7 @@
-"""S1 ownership-weighted solve: projection adjustment, plan scoring, and real solves on 2025-26 data."""
+"""S1 ownership weighting: projection adjustment, plan scoring and the EO loaders. Real solves are in test_cli."""
 
 import gzip
 import json
-from itertools import pairwise
 from pathlib import Path
 
 import pandas as pd
@@ -74,86 +73,7 @@ def test_score_plan_uses_raw_xp_and_hits():
     assert s["captain"] == "p1"
 
 
-def test_plan_key_tells_captains_apart():
-    assert ow.plan_key(_solution(1)) == ow.plan_key(_solution(1))
-    assert ow.plan_key(_solution(1)) != ow.plan_key(_solution(2))
-    assert ow.plan_key(_solution(1)) != ow.plan_key(_solution(1, buy="Saka"))
-
-
-# --- real solves (upstream MILP on 2025-26 history) ------------------------------------------
-
-SEASON, GW = "2025-26", 20
-
-
-@pytest.fixture(scope="module")
-def setup():
-    from fplrank.data import historical, offline
-
-    players, teams = historical.players_raw(SEASON), historical.teams(SEASON)
-    fixtures = offline.build_fixtures(historical.fixtures(SEASON))
-    bootstrap = offline.build_bootstrap(players, teams, GW)
-    proj = offline.placeholder_projections(players, teams, fixtures, [GW], games_played=GW - 1)
-    opts = {"preseason": True, "horizon": 1, "use_wc": [GW], "secs": 120, "xmin_lb": 0, "keep_top_ev_percent": 30, "gap": 0}
-    return offline.preseason_team(), proj, bootstrap, fixtures, opts
-
-
-def _xp_weighted_eo(sol, proj, eo):
-    xp = proj.set_index("ID")[f"{GW}_Pts"]
-    rows = sol["picks"][sol["picks"]["week"] == GW]
-    return sum(r.multiplier * xp[r.id] * eo.get(r.id, 0.0) for r in rows.itertuples())
-
-
-@pytest.mark.slow
-@pytest.mark.network
-def test_lambda_zero_is_the_ev_plan(setup):
-    from fplrank.baseline import solve_ev
-
-    my_data, proj, bootstrap, fixtures, opts = setup
-    eo = pd.Series(dict.fromkeys(proj.nlargest(30, f"{GW}_Pts")["ID"], 1.4))
-    ev = solve_ev(my_data, proj, bootstrap, fixtures, opts)[0]
-    s0 = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
-    assert ow.plan_key(s0) == ow.plan_key(ev)
-
-
-@pytest.mark.slow
-@pytest.mark.network
-def test_rising_lambda_trades_ev_for_field_cover(setup):
-    my_data, proj, bootstrap, fixtures, opts = setup
-    # a field that owns some good-but-not-best players heavily
-    ranked = proj.sort_values(f"{GW}_Pts", ascending=False)["ID"].tolist()
-    eo = pd.Series({**dict.fromkeys(ranked[5:25], 1.0), **dict.fromkeys(ranked[25:40], 0.8), ranked[10]: 1.8})
-    sols = [ow.solve_with_ownership(my_data, proj, eo, lam, bootstrap, fixtures, opts) for lam in (0.0, 0.1, 0.2, 0.3)]
-    cover = [_xp_weighted_eo(s, proj, eo) for s in sols]
-    evs = [s["ev"] for s in sols]
-    assert all(b >= a - 1e-6 for a, b in pairwise(cover))
-    assert all(b <= a + 1e-6 for a, b in pairwise(evs))
-    assert cover[-1] > cover[0] and evs[-1] < evs[0]
-
-
-@pytest.mark.slow
-@pytest.mark.network
-def test_captain_flips_to_the_high_eo_player(setup):
-    my_data, proj, bootstrap, fixtures, opts = setup
-    s0 = ow.solve_with_ownership(my_data, proj, pd.Series(dtype=float), 0.0, bootstrap, fixtures, opts)
-    rows = s0["picks"][s0["picks"]["week"] == GW]
-    cap = int(rows.loc[rows["captain"] == 1, "id"].iloc[0])
-    other = int(rows[(rows["lineup"] == 1) & (rows["captain"] == 0)].sort_values("xP")["id"].iloc[-1])
-    proj = proj.copy()
-    cap_xp = proj[f"{GW}_Pts"].max() + 1  # placeholder projections have ties: make the captain clear
-    proj.loc[proj["ID"] == cap, f"{GW}_Pts"] = cap_xp
-    proj.loc[proj["ID"] == other, f"{GW}_Pts"] = cap_xp - 0.2  # slightly worse than our EV captain...
-    eo = pd.Series({cap: 0.3, other: 1.6})  # ...but the field captains him
-
-    def captain(lam):
-        s = ow.solve_with_ownership(my_data, proj, eo, lam, bootstrap, fixtures, opts)
-        r = s["picks"][s["picks"]["week"] == GW]
-        return int(r.loc[r["captain"] == 1, "id"].iloc[0])
-
-    assert captain(0.0) == cap
-    assert captain(0.1) == other
-
-
-# --- S1b: offline run on a saved real team (rank 1 overall, before the GW6 deadline) with ep_next -----
+# --- S1b: FPL ep_next as projections, on the saved GW6 payloads -----------------------------------
 
 FIXTURE = Path(__file__).parent / "fixtures" / "gw6_live"
 
@@ -163,32 +83,18 @@ def _gw6():
         bootstrap = json.load(f)
     with gzip.open(FIXTURE / "fixtures.json.gz", "rt", encoding="utf-8") as f:
         fixtures = json.load(f)
-    return json.loads((FIXTURE / "my_data.json").read_text()), bootstrap, fixtures
+    return bootstrap, fixtures
 
 
 def test_ep_next_projections_follow_fixture_counts():
     from fplrank.data.projections import from_ep_next
 
-    _, bootstrap, fixtures = _gw6()
+    bootstrap, fixtures = _gw6()
     proj = from_ep_next(bootstrap, fixtures, horizon=4)
     assert [c for c in proj.columns if c.endswith("_Pts")] == ["6_Pts", "7_Pts", "8_Pts", "9_Pts"]
     assert len(proj) == len(bootstrap["elements"]) and proj["ID"].is_unique
     raya = proj.set_index("ID").loc[1]
     assert raya["6_Pts"] == pytest.approx(float(next(e["ep_next"] for e in bootstrap["elements"] if e["id"] == 1)))
-
-
-@pytest.mark.slow
-def test_s1_runs_offline_on_a_real_team_with_ep_next():
-    from fplrank.baseline import solve_ev
-    from fplrank.data.projections import from_ep_next
-
-    my_data, bootstrap, fixtures = _gw6()
-    proj = from_ep_next(bootstrap, fixtures, horizon=4)
-    opts = {"horizon": 4, "secs": 120, "gap": 0}
-    ev = solve_ev(my_data, proj, bootstrap, fixtures, opts)[0]
-    eo = pd.Series({e["id"]: 1.5 for e in bootstrap["elements"][:40]})
-    s0 = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
-    assert ow.plan_key(s0) == ow.plan_key(ev)
 
 
 def test_solio_eo_matches_names_and_varies_by_gw(tmp_path):
@@ -237,24 +143,3 @@ def test_forecast_eo_returns_eo_mean_by_player(monkeypatch):
     assert set(eo.index) == {1, 2, 3}
     assert eo.sum() == pytest.approx(12.0)  # 11 starters plus one captain, no chips
     assert eo[1] > eo[2] > 0
-
-
-@pytest.mark.slow
-def test_lam_on_first_gw_leaves_later_gws_alone():
-    """λ only on GW6: when the GW6 plan is unchanged, the later GWs' picks match the λ = 0 plan's."""
-    from fplrank.data.projections import from_ep_next
-
-    my_data, bootstrap, fixtures = _gw6()
-    proj = from_ep_next(bootstrap, fixtures, horizon=3)
-    opts = {"horizon": 3, "secs": 120, "gap": 0}
-    eo = pd.Series({e["id"]: 1.5 for e in bootstrap["elements"][:40]})
-    base = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
-
-    def later(sol):
-        p = sol["picks"]
-        p = p[p["week"] > 6]
-        return sorted(zip(p["week"], p["id"], p["multiplier"], strict=True))
-
-    first_only = ow.solve_with_ownership(my_data, proj, eo, 0.02, bootstrap, fixtures, opts, lam_gw=6)
-    assert ow.plan_key(first_only) == ow.plan_key(base)
-    assert later(first_only) == later(base)
