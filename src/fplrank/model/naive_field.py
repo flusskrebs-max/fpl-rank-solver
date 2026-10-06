@@ -508,6 +508,8 @@ def compare(secs=15, horizon=5, log=print) -> tuple[pd.DataFrame, pd.DataFrame]:
         f.unlink()
     wc_secs = time.time() - t0
     log(f"{len(templates) * len(TEMPLATE_HORIZONS)} template wildcard solves in {wc_secs:.0f}s")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    pd.concat([t.assign(group=g, gw=gw) for (g, gw), t in templates.items()]).to_parquet(OUT_DIR / "templates.parquet")
 
     rows = []
     for group in GROUPS:
@@ -539,16 +541,29 @@ def compare(secs=15, horizon=5, log=print) -> tuple[pd.DataFrame, pd.DataFrame]:
                     rows.append({**base, "variant": "cheap", "k": k, "w": w, **f})
                     rows.append({**base, "variant": "cheap_approx", "k": k, "w": w, **f})
     table = pd.DataFrame(rows)
-    # leave-one-GW-out choice of (k, w) for the cheap models
+    table = pick_lowo(table, next_gws)
+    return table, passes(table)
+
+
+def pick_lowo(table: pd.DataFrame, next_gws, out=OUT_DIR / "compare_table.csv") -> pd.DataFrame:
+    """Leave-one-GW-out choice of (k, w) for the cheap models: each GW gets the values best on the other GWs.
+
+    `cheap_wcshare` fits k only: its w is that GW's wildcard share, so it differs by GW and can't be matched
+    across GWs (grouping by (k, w) there picked k from a single other GW).
+    """
     picked, fixed = [], table[table["variant"].isin(["mix", "persistence"])]
     for (_, variant), t in table[~table.index.isin(fixed.index)].groupby(["group", "variant"]):
         target = "eo_gap_mix" if variant == "cheap_approx" else "eo_mae"
+        keys = ["k"] if variant == "cheap_wcshare" else ["k", "w"]
         for gw in next_gws:
-            k, w = t[t["gw"] != gw].groupby(["k", "w"])[target].mean().idxmin()
-            picked.append(t[(t["gw"] == gw) & (t["k"] == k) & ((t["w"] == w) | (variant == "cheap_wcshare"))])
+            best = t[t["gw"] != gw].groupby(keys)[target].mean().idxmin()
+            best = dict(zip(keys, best if isinstance(best, tuple) else (best,), strict=True))
+            picked.append(t[(t["gw"] == gw) & (t[list(best)] == pd.Series(best)).all(axis=1)])
     table = pd.concat([fixed, *picked])
-    table.to_csv(OUT_DIR / "compare_table.csv", index=False)
-    return table, passes(table)
+    if out is not None:
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        table.to_csv(out, index=False)
+    return table
 
 
 # ---------------------------------------------------------------------------- chips (Alex: lots of chips in GW2-5)

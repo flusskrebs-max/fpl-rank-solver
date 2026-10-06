@@ -62,6 +62,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 - `src/fplrank/model/ownership.py`: ownership dynamics v0. `forecast_eo(group, gw_next, state, model)`
   = next-GW EO with an 80% band (XI share logistic transition + captain softmax; chips as input).
   `fit_default()`, `backtest()`; results in `docs/research/ownership-dynamics-v0.md`.
+- `src/fplrank/model/naive_field.py`: his solver on every AE64/E64 squad (EO idea 3); `model/eo_blend.py`: the EO blend
+  (fair persistence, XI/captain re-pick, drift, banked solve, templates) and the critique checks; `docs/research/eo-blend.md`.
 - `notebooks/`: analysis as cell-marked `.py` files (`# %%`); open in VS Code or run with uv.
 - `src/fplrank/sim/scenarios.py`: scenario engine ([A]). `simulate(projections, fixtures, S, H, seed, rules=season)`
   -> int points `[S, H, players]`, correlated via shared team goals, means matched to projections.

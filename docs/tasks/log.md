@@ -99,3 +99,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, `--eo elite`: AE64 and E64 EO averaged, drift against the same average. Collected EO now has last GW's chips
   taken out (TC as a normal captain, BB bench 0, free hitters with the squad they return to); before, GW3's TC/FH week
   read up to 12.6 EO per manager instead of 12. Hook for later: `opt.ownership.LIVE_WEIGHT` (0) blends top10k into `elite`.
+- 2026-10-06, EO blend (`model/eo_blend.py`, `eo-blend.md`): weighted average of fair persistence, XI/captain re-pick,
+  EV drift, per-manager banked solve and wildcard templates, fitted on non-chip manager-weeks, LOWO. The re-pick alone
+  (no solver, no transfers) beats the per-manager solve: EO error 7.3 / 5.8 vs 7.9 / 6.1 (persistence 11.6 / 8.5); the
+  fit puts nearly all weight on it. Critique checks done (fixed player sets, chip split, surges, captains, MIP gaps
+  0.2% median, bootstrap). Fixed `cheap_wcshare` LOWO and the hits wording.
