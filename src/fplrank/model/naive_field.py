@@ -551,6 +551,57 @@ def compare(secs=15, horizon=5, log=print) -> tuple[pd.DataFrame, pd.DataFrame]:
     return table, passes(table)
 
 
+# ---------------------------------------------------------------------------- chips (Alex: lots of chips in GW2-5)
+
+CHIPS = ("wildcard", "freehit", "bboost", "3xc")
+
+
+def chip_counts(chips: pd.DataFrame, members: pd.DataFrame) -> pd.DataFrame:
+    """Managers playing each chip, per group and GW."""
+    c = chips.merge(members, on="entry_id")
+    table = c.pivot_table(index=["group", "gw"], columns="chip", values="entry_id", aggfunc="count", fill_value=0)
+    return table.reindex(columns=list(CHIPS), fill_value=0)
+
+
+def deadline_rows(picks: pd.DataFrame) -> pd.DataFrame:
+    """Picks as (entry_id, gw, fpl_id, multiplier) at the deadline: autosubs undone (XI = positions 1-11 count 1,
+    bench 0 unless bench boost); captain 2, or 3 on triple captain, as picked."""
+    p = picks.copy()
+    starter = p["position"] <= 11
+    mult = starter.astype(int) + (p["active_chip"] == "bboost") * (~starter)
+    mult = mult + p["is_captain"].astype(int) + (p["is_captain"] & (p["active_chip"] == "3xc")).astype(int)
+    return p.assign(multiplier=mult.astype(int))[["entry_id", "gw", "fpl_id", "multiplier"]]
+
+
+def chip_split(log=print) -> pd.DataFrame:
+    """Per-manager (`mix` and `banked`) and persistence errors, split into managers who played a chip in t+1 and
+    those who didn't. Actual and persistence EO are rebuilt from each subset's own picks (`deadline_rows`)."""
+    members, picks, _, chips, _ = _load()
+    solved = pd.read_parquet(OUT_DIR / "backtest_solves.parquet")
+    rows_actual = deadline_rows(picks)
+    out = []
+    for group in GROUPS:
+        ids = members.loc[members["group"] == group, "entry_id"]
+        for gw in sorted(solved["gw"].unique()):
+            played = chips[(chips["gw"] == gw) & chips["entry_id"].isin(ids)]
+            wc = set(played.loc[played["chip"] == "wildcard", "entry_id"])
+            for subset, sub_ids in (("chip", ids[ids.isin(played["entry_id"])]), ("no chip", ids[~ids.isin(played["entry_id"])])):
+                if sub_ids.empty:
+                    continue
+                prev = group_table(rows_actual[rows_actual["gw"] == gw - 1], sub_ids)
+                now = group_table(rows_actual[rows_actual["gw"] == gw], sub_ids)
+                s = solved[(solved["gw"] == gw) & solved["entry_id"].isin(sub_ids)]
+                is_wc = s["entry_id"].isin(wc)
+                mix = group_table(s[((s["variant"] == "wc") & is_wc) | ((s["variant"] == "banked") & ~is_wc)], sub_ids)
+                banked = group_table(s[s["variant"] == "banked"], sub_ids)
+                base = {"group": group, "gw": gw, "managers": subset, "n": len(sub_ids)}
+                for name, f in (("persistence", prev), ("mix", mix), ("banked", banked)):
+                    out.append({**base, "variant": name, **score(prev, now, f)})
+    table = pd.DataFrame(out)
+    table.to_csv(OUT_DIR / "chip_split.csv", index=False)
+    return table
+
+
 def forecast(next_gw: int, secs=20, workers=4, variants=VARIANTS, horizon=None, projection=None, log=print) -> pd.DataFrame:
     """Naive-field ownership and EO for `next_gw` per group and variant, saved to data/derived/naive_field/."""
     members, picks, transfers, chips, _ = _load()
@@ -572,7 +623,7 @@ def forecast(next_gw: int, secs=20, workers=4, variants=VARIANTS, horizon=None, 
 
 def _main(argv=None):
     p = argparse.ArgumentParser(prog="python -m fplrank.model.naive_field", description=__doc__.split("\n\n")[0])
-    p.add_argument("mode", choices=["backtest", "forecast", "compare"])
+    p.add_argument("mode", choices=["backtest", "forecast", "compare", "chips"])
     p.add_argument("--gw", type=int, help="forecast: the GW to forecast")
     p.add_argument("--secs", type=int, default=15, help="time limit per solve (his `secs`)")
     p.add_argument("--workers", type=int, default=4)
@@ -586,6 +637,10 @@ def _main(argv=None):
         table, check = backtest(args.secs, args.workers, args.sample, tuple(args.variants), args.horizon)
         print(table.round(2).to_string(index=False))
         print(check.round(3).to_string(index=False))
+    elif args.mode == "chips":
+        members, _, _, chips, _ = _load()
+        print(chip_counts(chips, members).to_string())
+        print(chip_split().round(2).to_string(index=False))
     elif args.mode == "compare":
         table, check = compare(args.secs, args.horizon)
         print(table.round(2).to_string(index=False))

@@ -19,6 +19,9 @@ in `tests/test_naive_field.py` (synthetic data only). Pass criteria are the ones
   It is only a little closer to the per-manager forecast than persistence is (EO 8-12 points apart, vs
   11-14 for persistence). Its biggest gap is that it keeps last week's XI and captaincy. Re-picking
   those, as the per-manager solves do, is the next step (see "Agreed approach" in `eo-projector.md`).
+- Chips were heavy (GW3: 60 of 64 AE64 managers played one). Only the wildcard is modelled. Split by
+  chip use, the EO gain holds for managers who played no chip (AE64 7.4 vs 14.1 points, E64 9.8 vs
+  13.3), but their ownership error is slightly worse than persistence: see "Chips" below.
 
 ## Data
 
@@ -42,16 +45,19 @@ GW2 deadline, covers GW2-13) and `GW06_20261005.csv`. So:
   price changes or news after 22 August, which is exactly what drives many real transfers. These weeks
   understate what the method could do with fresh files.
 
-What happened in these weeks, which matters for reading the results:
+Chips played, managers per group (out of 64; `chip_counts`), and 20+ point ownership moves:
 
-| GW | AE64 wildcards | E64 wildcards | Other chips (both groups) | 20+ point moves (AE64 / E64) |
-|---|---|---|---|---|
-| 2 | 0 | 0 | 19 bench boosts | 0 / 0 |
-| 3 | 39 (61%) | 20 (31%) | 31 free hits, 29 triple captains | 34 / 17 |
-| 4 | 10 | 10 | 61 triple captains, 4 free hits | 16 / 8 |
-| 5 | 6 | 7 | 9 free hits | 3 / 3 |
+| GW | AE64 WC | FH | BB | TC | E64 WC | FH | BB | TC | 20+ moves (AE64 / E64) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | 0 | 48 | 0 | 0 | 0 | 49 | 0 | |
+| 2 | 0 | 0 | 12 | 0 | 0 | 0 | 7 | 0 | 0 / 0 |
+| 3 | 39 | 21 | 0 | 1 | 20 | 12 | 0 | 28 | 34 / 17 |
+| 4 | 10 | 0 | 0 | 39 | 10 | 4 | 1 | 26 | 16 / 8 |
+| 5 | 6 | 6 | 0 | 0 | 7 | 4 | 1 | 0 | 3 / 3 |
 
-GW1 also had 93 bench boosts among the 124, so GW1's EO includes most benches.
+So in GW3 only 3 AE64 and 4 E64 managers played no chip, and in GW4 about two thirds of each group
+played one. These are not normal weeks.
+
 
 ## Method: per-manager ("naive field") run
 
@@ -234,6 +240,44 @@ reasons are visible in the numbers:
   template squad even in GW2, when nobody wildcarded, which is why the fitted blends are worst in GW2
   (ownership error 9-17 points against 0.1 for persistence).
 
+## Chips: how the solves handled them, and errors split by chip use
+
+How each chip was handled:
+
+| Chip | In the solves | Effect on the forecast |
+|---|---|---|
+| Wildcard | modelled: the `wc` variant forces one in GW t+1; `mix` uses it for managers who really wildcarded | the only chip in the forecast |
+| Free hit | not modelled (his chip limits are 0 unless forced) | the solver makes normal transfers for free-hitters; their real GW t+1 squad is a one-week team. The week after, his `generate_team_json` skips free-hit transfers, so the starting squad is the pre-free-hit one |
+| Bench boost | not modelled | bench EO is 0 in the forecast; in the week after a bench boost, persistence carries the bench's EO forward |
+| Triple captain | not modelled | the captain counts 2, not 3; GW4's TCs (39 AE64, 26 E64) add EO no forecast predicts |
+
+Errors split by whether the manager played any chip in GW t+1 (`chip_split`; `mix` uses real wildcard
+use). Actual and persistence EO here are rebuilt from each subset's own picks at the deadline
+(starters 1, bench 0 unless bench boost, captain +1, triple captain +2, autosubs undone), so the
+numbers differ a little from the collector's EO above. Means over GW2-5; EO error with ownership error
+in brackets:
+
+| | AE64 chip | AE64 no chip | E64 chip | E64 no chip |
+|---|---|---|---|---|
+| managers per GW | 12 / 61 / 49 / 12 | 52 / 3 / 15 / 52 | 7 / 60 / 41 / 12 | 57 / 4 / 23 / 52 |
+| persistence | 18.4 (15.7) | 14.1 (3.8) | 13.7 (10.6) | 13.3 (5.2) |
+| per-manager `mix` | 12.8 (12.1) | **7.4** (4.8) | 10.8 (10.1) | **9.8** (5.7) |
+| per-manager `banked` | 14.0 (13.3) | 7.4 (4.8) | 11.1 (10.1) | 9.8 (5.7) |
+
+By week, non-chip managers only (EO error, persistence vs `mix`): AE64 7.1 vs 4.0 (GW2), 22.9 vs 11.8
+(GW3, 3 managers), 15.9 vs 7.2 (GW4), 10.4 vs 6.6 (GW5); E64 6.1 vs 4.8, 26.4 vs 21.3 (4 managers),
+12.6 vs 8.5, 8.3 vs 4.6.
+
+What the split shows:
+
+- **The EO gain holds for managers with no chip**: about half the error of persistence for AE64 and
+  a quarter less for E64. So it isn't an artefact of chips, but it still comes from XI and captain:
+  their **ownership** error is worse than persistence (4.8 vs 3.8, 5.7 vs 5.2). In quiet weeks the
+  solver makes transfers these managers don't (GW5 AE64: 5.1 vs 1.6 points of ownership error).
+- **Chip managers are where the ownership gain is**: the wildcard solves move ownership the right way
+  (AE64 12.1 vs 15.7), though errors stay large. Free-hitters and triple captains aren't modelled.
+- Small subsets (3-4 managers in GW3) make single-week numbers noisy.
+
 ## Runtimes and scaling
 
 | Run | Solves | Wall time (Alex's PC, 6 workers) |
@@ -257,8 +301,9 @@ of 124 squads on 6 workers, or 2-3 hours for a four-week backtest like this one.
 - **EO gain is mostly lineup and captaincy, not transfers.** A fairer baseline would hold ownership and
   re-pick XI and captain (eo-flow-v1's "captain only" baseline gained 1-5% over persistence on
   2025-26). We didn't build that here.
-- **Chip weeks**: the solver never triple-captains or bench-boosts, so it can't match GW4's 61 triple
-  captains; persistence carries last week's chips forward instead. Both are wrong in chip weeks.
+- **Chip weeks**: only the wildcard is modelled. The solver never free-hits, triple-captains or
+  bench-boosts, so it can't match GW4's 65 triple captains; persistence carries last week's chips
+  forward instead. Both are wrong in chip weeks (see the chip split above).
 - **`mix` and `cheap_wcshare` use real wildcard use in t+1**, which isn't known at the deadline.
   `banked` and `cheap` don't.
 - **Prices before a deadline are estimated** from what collected managers paid; players few bought
@@ -274,10 +319,11 @@ Needs the collected data on Alex's PC (`data/collected/`, `data/projections/`, s
 
     uv run python -m fplrank.model.naive_field backtest --workers 6     # per-manager run, ~50 min
     uv run python -m fplrank.model.naive_field compare                  # cheap blends + gaps, ~7 min
+    uv run python -m fplrank.model.naive_field chips                    # chip counts and the chip split
     uv run python -m fplrank.model.naive_field forecast --gw 6          # GW6 forecast, to score after 10 Oct
 
 Outputs (git-ignored): `data/derived/naive_field/backtest_solves.parquet`, `backtest_table.csv`,
-`compare_table.csv`, `forecast_GW{n}.csv`. Defaults: horizon 5, 15 s cap, all four variants.
+`compare_table.csv`, `chip_split.csv`, `forecast_GW{n}.csv`. Defaults: horizon 5, 15 s cap, all four variants.
 
 ## Next
 

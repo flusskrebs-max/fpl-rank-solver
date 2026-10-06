@@ -119,3 +119,23 @@ def test_eo_gap():
     a = pd.DataFrame({"fpl_id": [1, 3], "own": [1.0, 0.5], "eo": [1.0, 0.5]})
     assert nf.eo_gap(prev, a, a) == 0
     assert nf.eo_gap(prev, a, prev) == pytest.approx((100 + 50 + 50) / 3)
+
+
+def test_deadline_rows_and_chip_counts():
+    picks = pd.DataFrame(
+        {
+            "entry_id": 1,
+            "gw": 3,
+            "fpl_id": [10, 11, 12],
+            "position": [1, 2, 12],
+            "is_captain": [True, False, False],
+            "active_chip": ["3xc", "3xc", "3xc"],
+            "multiplier": [0, 1, 1],  # after autosubs
+        }
+    )
+    assert nf.deadline_rows(picks)["multiplier"].tolist() == [3, 1, 0]
+    assert nf.deadline_rows(picks.assign(active_chip="bboost"))["multiplier"].tolist() == [2, 1, 1]
+    chips = pd.DataFrame({"entry_id": [1, 2, 3], "gw": [3, 3, 4], "chip": ["wildcard", "3xc", "wildcard"]})
+    members = pd.DataFrame({"group": ["AE64", "AE64", "E64"], "entry_id": [1, 2, 3]})
+    c = nf.chip_counts(chips, members)
+    assert c.loc[("AE64", 3)].tolist() == [1, 0, 0, 1] and c.loc[("E64", 4), "wildcard"] == 1
