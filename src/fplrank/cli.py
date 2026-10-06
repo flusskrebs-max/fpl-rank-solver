@@ -7,7 +7,8 @@
 
 His flags (horizon, use_wc, banned, team_id, ...) and his settings files are passed to his
 `run/solve.py::solve_regular` unchanged. With `--eo`, his projections are read as usual and scaled by
-xP x (1 + λ x (EO - 1)) for the next GW only (`opt.ownership`), once per λ. A collector group's EO is its
+xP x (1 + λ_k x (EO - 1)), λ_k = λ x d^k for the GW k weeks after the next (`--eo_decay` d, default 0.7; 0 = next GW
+only), once per λ (`opt.ownership`). A collector group's EO is its
 managers' latest squads re-picked on his next-GW xP (`ownership.repick_eo`). The plan with the best
 P(reaching the target line) (`opt.rank_goal`) is printed with his normal output under a short λ block.
 
@@ -146,6 +147,12 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--lam", type=float, help="fix λ instead of choosing it (0 = his EV plan)")
     p.add_argument("--points", type=int, help="our total points now, for --target (default: from the FPL API)")
     p.add_argument("--kappa", type=float, help="share of our projected edge over the field that counts, for --target (default 0.75)")
+    p.add_argument(
+        "--eo_decay",
+        type=float,
+        default=ownership.EO_DECAY,
+        help=f"λ's decay a GW after the next one, on top of his decay_base (default {ownership.EO_DECAY:g}; 0 = next GW only)",
+    )
     p.add_argument("--sims", type=int, help="then run his simulations N times at the chosen λ and print his summary")
     return p
 
@@ -173,7 +180,10 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
             eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, runs[lam].projections)
         else:
             runs[lam] = run(
-                theirs, lambda proj, _, lam=lam, eo=eo, gw=gw: ownership.adjust_projections(proj, eo, lam, gw), request, quiet=True
+                theirs,
+                lambda proj, _, lam=lam, eo=eo, gw=gw: ownership.adjust_projections(proj, eo, lam, gw, ours.eo_decay),
+                request,
+                quiet=True,
             )
         print(f"  {i}/{len(lams)}: λ = {lam:g} solved in {time.perf_counter() - start:.0f}s", flush=True)
 
@@ -181,7 +191,14 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     hit_cost = base.options.get("hit_cost", 4)
     solutions = {lam: {**r.solution, **ownership.score_plan(r.solution, base.projections, eo, hit_cost)} for lam, r in runs.items()}
     print()
-    print(f"EO {eo_text}; λ on GW{gw} only")
+    decay_base = 1.0 if base.options.get("objective") == "regular" else base.options.get("decay_base", 0.84)
+    if ours.eo_decay:
+        term = decay_base * ours.eo_decay
+        print(
+            f"EO {eo_text}; λ in full on GW{gw}, then x{ours.eo_decay:g} a GW (EO term x{term:.2f} a GW with his decay_base {decay_base:g})"
+        )
+    else:
+        print(f"EO {eo_text}; λ on GW{gw} only")
     if ours.target:
         points = ours.points
         if points is None:
@@ -207,7 +224,7 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     print(f"\n--- Sertalp's solver, plan for λ = {chosen:g} ---")
     print(runs[chosen].output)
     if ours.sims:
-        adjust = None if chosen == 0 else lambda proj, _: ownership.adjust_projections(proj, eo, chosen, gw)
+        adjust = None if chosen == 0 else lambda proj, _: ownership.adjust_projections(proj, eo, chosen, gw, ours.eo_decay)
         simulate(theirs, ours.sims, gw, adjust, request)
     return 0
 
@@ -216,7 +233,8 @@ def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     sys.stdout.reconfigure(encoding="utf-8")  # player names and λ on the Windows console
     if not argv or argv[0] != "solve":
-        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--kappa κ] [--sims N]")
+        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--kappa κ]", end="")
+        print(" [--eo_decay d] [--sims N]")
         return 2
     return solve(argv[1:])
 

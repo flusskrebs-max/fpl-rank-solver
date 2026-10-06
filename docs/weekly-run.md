@@ -62,6 +62,9 @@ Type your real team id in place of `<your team id>` (PowerShell rejects the `<`)
   top 10,000). Your points come from the FPL API, or give `--points`. Use `--lam 0.1` instead to fix λ.
   `--kappa 0.5` changes how much of your projected edge over the field counts (default 0.75;
   `docs/research/rank-goal-inputs.md`).
+- `--eo_decay 0.7` (the default) applies λ in full to next GW and λ x 0.7^k to the GW k weeks later, on top of
+  his `decay_base`. `--eo_decay 0` weighs EO on next GW only; `1` keeps λ at full strength through the horizon
+  (`docs/research/eo-horizon.md`).
 - `--sims 50` then runs his simulations 50 times at the chosen λ (his noise on the projections) and
   prints his summary of how often each move comes up. Leave it out for a quick run.
 - Any of his flags work as usual: `--horizon 5`, `--use_wc "[8]"`, `--banned "[...]"`, and so on.

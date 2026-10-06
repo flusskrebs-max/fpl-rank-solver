@@ -117,3 +117,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
   seasons 2018-26 (`rank.target.season_drift`; top 10k +1.2 a GW, ±11 over 33 GWs vs E64, ±42 vs AE64) instead
   of this season's GW2-5 drift (+4.2 / +2.5) and the absolute line's ±95, which counted the group's swings twice.
   κ 0.3 to 0.75 (data say about 1), `--kappa` overrides. Evidence: `docs/research/rank-goal-inputs.md`.
+- 2026-10-06, EOH: `fplrank solve --eo` applies λ to every GW, λ x d^k k GWs after the next (`--eo_decay`, default
+  0.7, 0 = old next-GW rule), on top of Sertalp's decay_base. Later GWs' EO is the current squads re-picked on that
+  GW's xP (was next GW's EO reused). Team 157924, top 10k: d = 0.7 picks λ -0.2 (P 30.6% vs 30.3%, EV cost 0.7,
+  different GW6 moves); d = 1 costs up to 17 EV at |λ| 0.3. EO persists ~0.95 a GW, so 0.7 is a judgement.
+  `docs/research/eo-horizon.md`.

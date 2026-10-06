@@ -130,6 +130,20 @@ def test_lam_gw_scales_only_that_gw():
     pd.testing.assert_frame_equal(ow.adjust_projections(proj, eo, 0.2, lam_gw=None), ow.adjust_projections(proj, eo, 0.2))
 
 
+def test_decay_scales_later_gws_by_lam_times_decay_power():
+    proj, eo = _proj().assign(**{"5_Pts": [1.0, 1.0, 1.0], "8_Pts": [4.0, 4.0, 4.0]}), pd.Series({1: 1.0, 2: 1.6})
+    adj = ow.adjust_projections(proj, eo, 0.2, lam_gw=6, decay=0.5)
+    assert list(adj["5_Pts"]) == list(proj["5_Pts"])  # before the next GW: raw
+    assert list(adj["6_Pts"]) == pytest.approx([6.0, 4.0 * 1.12, 2.0 * 0.8])  # next GW: λ in full
+    assert list(adj["7_Pts"]) == pytest.approx([5.0, 3.0 * 1.06, 1.0 * 0.9])  # λ x 0.5
+    assert list(adj["8_Pts"]) == pytest.approx([4.0, 4.0 * 1.03, 4.0 * 0.95])  # λ x 0.25
+    pd.testing.assert_frame_equal(ow.adjust_projections(proj, eo, 0.2, 6, decay=0.0), ow.adjust_projections(proj, eo, 0.2, 6))
+    pd.testing.assert_frame_equal(
+        ow.adjust_projections(proj, eo, 0.2, 6, decay=1.0)[["6_Pts", "7_Pts", "8_Pts"]],
+        ow.adjust_projections(proj, eo, 0.2)[["6_Pts", "7_Pts", "8_Pts"]],
+    )
+
+
 def _picks():
     """Three managers, two players each in the XI (1 captain) plus player 9 on the bench."""
     rows = []
@@ -202,3 +216,8 @@ def test_repick_eo_mixes_the_elite_groups_on_next_gw_xp(tmp_path):
     assert eo[13] == pytest.approx(1.0) and eo[113] == pytest.approx(1.0)  # captain x2, x 0.5
     with pytest.raises(ValueError):
         ow.repick_eo("elite", 5, xp, collected_dir=tmp_path)  # no picks before GW5
+    later = xp.copy()
+    later[[13, 113]], later[[14, 114]] = 1.0, 8.0
+    frame, _ = ow.repick_eo("elite", 6, pd.DataFrame({6: xp, 7: later}), collected_dir=tmp_path)
+    pd.testing.assert_series_equal(frame[6], eo.reindex(frame.index).fillna(0.0), check_names=False)
+    assert frame.loc[14, 7] == pytest.approx(1.0) and frame.loc[13, 7] < 1  # GW7 has its own captain

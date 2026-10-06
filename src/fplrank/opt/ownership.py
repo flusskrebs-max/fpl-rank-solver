@@ -11,9 +11,12 @@ EO = 1 is a scale choice, not a neutral point: it keeps adjusted values near raw
 *which* players are picked rather than how keen the solver is on hits. (For variance, owning a player
 once is neutral at EO 0.5 and captaining him at EO 1.5.)
 
-`fplrank solve` (cli.py) applies λ to the first GW of the horizon only (`lam_gw`): that is the GW being
-decided now, and EO further out is much less certain. Later GWs use raw xP. Each plan is then scored on
-the raw projections (`score_plan`) and the λ chosen by P(reaching the target line) (`rank_goal_table`).
+`fplrank solve` (cli.py) applies λ in full to the first GW of the horizon (`lam_gw`), the GW being decided
+now, and λ x d^k to the GW k weeks later (`decay`, `--eo_decay`, default `EO_DECAY`). The same next-GW EO is
+used for every GW, so this equals shrinking later GWs' EO towards 1. Sertalp's `decay_base` then discounts the
+scaled xP in his objective, so the EO term falls by (decay_base x d) a GW, always faster than xP; d = 0 is λ on
+the next GW only. Each plan is then scored on the raw projections (`score_plan`) and the λ chosen by
+P(reaching the target line) (`rank_goal_table`).
 """
 
 import re
@@ -23,6 +26,11 @@ import pandas as pd
 from fplrank.paths import COLLECTED_DIR
 
 SWEEP = (-0.3, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.3)
+# λ's extra decay a GW after the next one. EO itself persists well (2025-26 elite EO, regression of EO - 1 at
+# t + k on t: 0.79, 0.75, 0.70, 0.65 at k = 1-4, about 0.95 a GW), so this is deliberately harder than the
+# data alone asks: we re-solve every week with fresh EO, so a later GW's EO only matters through this week's
+# transfers, and it keeps a plan from chasing EO it can't act on yet. See docs/research/eo-horizon.md.
+EO_DECAY = 0.7
 _PTS = re.compile(r"^(\d+)_Pts$")
 
 
@@ -143,15 +151,22 @@ def eo_for(eo: pd.Series | pd.DataFrame, gw: int) -> pd.Series:
     return eo[max(cols)]
 
 
-def adjust_projections(projections: pd.DataFrame, eo: pd.Series | pd.DataFrame, lam: float, lam_gw: int | None = None) -> pd.DataFrame:
+def adjust_projections(
+    projections: pd.DataFrame, eo: pd.Series | pd.DataFrame, lam: float, lam_gw: int | None = None, decay: float = 0.0
+) -> pd.DataFrame:
     """Scale every `{gw}_Pts` column by (1 + lam x (EO - 1)), with that GW's EO (see `eo_for`).
 
-    With `lam_gw`, only that GW's column is scaled; the others keep raw xP.
+    With `lam_gw`, that GW gets lam and GW lam_gw + k gets lam x decay^k (decay 0: that GW only); earlier GWs
+    keep raw xP.
     """
     out = projections.copy()
     for col in out.columns:
-        if (m := _PTS.match(col)) and lam_gw in (None, int(m[1])):
-            out[col] = out[col] * (1 + lam * (out["ID"].map(eo_for(eo, int(m[1]))).fillna(0.0) - 1))
+        if not (m := _PTS.match(col)):
+            continue
+        gw = int(m[1])
+        lam_k = lam if lam_gw is None else lam * decay ** (gw - lam_gw) if gw >= lam_gw else 0.0
+        if lam_k:
+            out[col] = out[col] * (1 + lam_k * (out["ID"].map(eo_for(eo, gw)).fillna(0.0) - 1))
     return out
 
 
@@ -201,33 +216,40 @@ def score_plan(solution: dict, projections: pd.DataFrame, eo: pd.Series, hit_cos
 # used by `fplrank solve` (cli.py)
 
 
-def repick_eo(group: str, next_gw: int, xp: pd.Series, collected_dir=COLLECTED_DIR) -> tuple[pd.Series, int]:
+def repick_eo(group: str, next_gw: int, xp: pd.Series | pd.DataFrame, collected_dir=COLLECTED_DIR) -> tuple[pd.Series | pd.DataFrame, int]:
     """GW `next_gw` EO forecast for `group` from the collector's picks, as fpl_id -> EO, and the GW of the picks.
 
     The method `docs/research/eo-blend.md` found best: each manager's latest squad with chips taken out, XI and
     captain re-picked on `xp` (fpl_id -> next-GW xP) with no transfers, and for AE64/E64 the armband herded onto
     the consensus captain (`model.eo_blend.herd_captains`). `elite` is the `group_weights` mix of its groups.
+
+    With `xp` a frame (fpl_id x GW), the same squads are re-picked on each GW's xP: one EO column per GW, so a
+    later GW's EO has that GW's captain, not next GW's.
     """
     from fplrank.model import eo_blend
 
     picks = pd.read_parquet(collected_dir / "picks.parquet")
     members = pd.read_parquet(collected_dir / "members.parquet")
-    parts, gws = [], []
+    frame = xp if isinstance(xp, pd.DataFrame) else xp.to_frame(next_gw)
+    cols, gws = {}, []
     for g, w in group_weights(group).items():
         p = picks[picks["entry_id"].isin(members.loc[members["set"] == g, "entry_id"])]
         if p.empty or p["gw"].min() >= next_gw:
             raise ValueError(f"No collected picks for {g!r} before GW{next_gw}")
-        eo, last = eo_blend.next_gw_eo(p, next_gw, xp, eo_blend.HERD_CONC.get(g))
-        parts.append(eo * w)
+        for gw in frame.columns:
+            eo, last = eo_blend.next_gw_eo(p, next_gw, frame[gw], eo_blend.HERD_CONC.get(g))
+            cols.setdefault(gw, []).append(eo * w)
         gws.append(last)
-    return pd.concat(parts, axis=1).fillna(0.0).sum(axis=1).rename("eo"), min(gws)
+    out = pd.DataFrame({gw: pd.concat(parts, axis=1).fillna(0.0).sum(axis=1) for gw, parts in cols.items()}).fillna(0.0)
+    return (out if isinstance(xp, pd.DataFrame) else out[next_gw].rename("eo")), min(gws)
 
 
 def pick_eo(group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame | None = None) -> tuple[pd.Series | pd.DataFrame, str]:
     """EO for `group` (a collector group, or 'solio') and a one-line description of it.
 
     With `projections` (his, as read) holding next-GW xP and the collector's picks on disk, a collector group's
-    EO is `repick_eo`'s forecast; otherwise its latest chip-free EO, repeated (`load_eo`).
+    EO is `repick_eo`'s forecast, one column per GW from next GW on (squads as now, XI and captain re-picked on
+    each GW's xP); otherwise its latest chip-free EO, repeated (`load_eo`).
     """
     if group == "solio":
         eo = load_solio_eo(bootstrap)
@@ -237,11 +259,16 @@ def pick_eo(group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame
     col = f"{next_gw}_Pts"
     if projections is not None and col in projections:
         try:
-            eo, eo_gw = repick_eo(group, next_gw, projections.set_index("ID")[col].fillna(0.0))
+            xp = projections.set_index("ID")[[c for c in projections.columns if (m := _PTS.match(c)) and int(m[1]) >= next_gw]]
+            xp = xp.rename(columns=lambda c: int(c.split("_")[0])).fillna(0.0)
+            eo, eo_gw = repick_eo(group, next_gw, xp)
         except (FileNotFoundError, ValueError) as e:
             print(f"EO re-pick not possible ({e}); using the collected EO, repeated")
         else:
-            return eo, f"{group} GW{eo_gw} squads re-picked on GW{next_gw} xP ({len(eo)} players, total {eo.sum():.1f})"
+            first = eo[next_gw]
+            players = int((first > 0).sum())
+            text = f"{group} GW{eo_gw} squads re-picked on each GW's xP (GW{next_gw}: {players} players, total {first.sum():.1f})"
+            return eo, text
     eo, eo_gw = load_eo(group, next_gw - 1)
     return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
 
