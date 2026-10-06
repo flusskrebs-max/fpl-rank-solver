@@ -36,8 +36,6 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 
 ## Parked (revisit once v0.4 is in use)
 
-- Custom EO weights (e.g. AE64/E64/top10k mix) as a `fplrank solve` flag, then a box on the page; `elite` is a fixed 50/50
-  mix and `ownership.LIVE_WEIGHT` is 0 for now. Alex parked it on 2026-10-06.
 - Transfers in the EO forecast (ownership moves): the per-manager solve catches more of them than the re-pick
   (`docs/research/eo-blend.md`); worth it only if the re-pick misses big moves in use.
 - Wildcard templates weighted by the expected wildcard share for next GW; fallers continuing

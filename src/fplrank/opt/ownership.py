@@ -75,8 +75,24 @@ LIVE_WEIGHT = 0.0
 LIVE_GROUP = "top10k"
 
 
+COLLECTOR_GROUPS = ("AE64", "E64", "top1000", "top10k")
+FIXED_GROUPS = ("AE64", "E64")  # fixed lists: their past seasons are a fair drift baseline (drift_group)
+
+
 def group_weights(group: str, live_weight: float | None = None) -> dict[str, float]:
-    """Collector groups and weights behind an EO group: `elite` is the mix above, anything else is itself."""
+    """Collector groups and weights behind an EO group: `elite` is the mix above, a custom mix such as
+    `AE64:0.4+E64:0.4+top10k:0.2` (`--eo`; weights scaled to sum to 1) is those groups, anything else is itself."""
+    if ":" in group:
+        weights = {}
+        for part in group.split("+"):
+            g, _, w = part.partition(":")
+            if g not in COLLECTOR_GROUPS:
+                raise ValueError(f"EO mix {group!r}: {g!r} is not one of {', '.join(COLLECTOR_GROUPS)}")
+            weights[g] = weights.get(g, 0.0) + float(w)
+        total = sum(weights.values())
+        if total <= 0 or min(weights.values()) < 0:
+            raise ValueError(f"EO mix {group!r}: weights must be 0 or more and not all 0")
+        return {g: w / total for g, w in weights.items() if w > 0}
     if group != "elite":
         return {group: 1.0}
     w = LIVE_WEIGHT if live_weight is None else live_weight
@@ -116,6 +132,7 @@ def load_eo(group: str, gw: int | None = None, collected_dir=COLLECTED_DIR) -> t
     Players not listed have EO 0 (for the graphics that understates the tail by ~5%; see data-log).
     """
     weights = group_weights(group)
+    group = next(iter(weights)) if len(weights) == 1 else group  # a one-group mix is that group
     if len(weights) > 1:
         gw = min(load_eo(g, gw, collected_dir)[1] for g in weights)
         parts = [load_eo(g, gw, collected_dir)[0] * w for g, w in weights.items()]
@@ -331,9 +348,12 @@ def pick_eo(
 
 def drift_group(eo_group: str) -> str:
     """Collector group for the line's drift: the EO group if it is a fixed list (or the elite mix, measured
-    against the same mix), else AE64."""
+    against the same mix), a custom mix's fixed-list part, else AE64."""
     # top1000/top10k are today's top managers, so their drift is biased low (V1); default to a fixed list
-    return eo_group if eo_group in ("AE64", "E64", "elite") else "AE64"
+    if ":" in eo_group:
+        fixed = {g: w for g, w in group_weights(eo_group).items() if g in FIXED_GROUPS}
+        return "+".join(f"{g}:{w:g}" for g, w in fixed.items()) if fixed else "AE64"
+    return eo_group if eo_group in (*FIXED_GROUPS, "elite") else "AE64"
 
 
 def current_standing(team_id: int) -> tuple[int, int | None]:

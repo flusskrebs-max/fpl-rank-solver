@@ -254,3 +254,23 @@ def test_herd_q_shrink_splits_the_armband_evenly():
     sure = eo_blend.herd_captains(rows, xp, conc=1.0).set_index("fpl_id")["captain"]
     even = eo_blend.herd_captains(rows, xp, conc=1.0, q_shrink=1.0).set_index("fpl_id")["captain"]
     assert sure[13] > 0.99 and even[13] == pytest.approx(0.5) and even[14] == pytest.approx(0.5)
+
+
+def test_custom_mix_weights_and_drift_group():
+    assert ow.group_weights("AE64:2+E64:1+top10k:1") == pytest.approx({"AE64": 0.5, "E64": 0.25, "top10k": 0.25})
+    assert ow.group_weights("AE64:1+top10k:0") == {"AE64": 1.0}
+    drift = ow.drift_group("AE64:0.4+E64:0.4+top10k:0.2")  # top10k's drift is biased low: left out
+    assert ow.group_weights(drift) == pytest.approx({"AE64": 0.5, "E64": 0.5})
+    assert ow.drift_group("top1000:0.5+top10k:0.5") == "AE64"
+    for bad in ("AE64:0.5+solio:0.5", "AE64:0+E64:0", "AE64:-1+E64:2"):
+        with pytest.raises(ValueError):
+            ow.group_weights(bad)
+
+
+def test_custom_mix_load_eo(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "fplrank.data.elite.load_eo", lambda *a: pd.DataFrame({"gw": [5, 5], "group": ["AE64", "E64"], "fpl_id": [7, 7], "eo": [1.0, 0.5]})
+    )
+    eo, gw = ow.load_eo("AE64:3+E64:1", 5, collected_dir=tmp_path)
+    assert gw == 5 and eo[7] == pytest.approx(0.875)
+    assert ow.load_eo("E64:1", 5, collected_dir=tmp_path)[0][7] == pytest.approx(0.5)

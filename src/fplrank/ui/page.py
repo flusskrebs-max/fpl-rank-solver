@@ -14,7 +14,19 @@ import pandas as pd
 import streamlit as st
 
 from fplrank.paths import DATA_DIR, PROJECT_ROOT, UPSTREAM_DIR
-from fplrank.ui.command import EO_GROUPS, MODES, Choices, chosen_lam, command_line, p_by_lam, solve_args
+from fplrank.ui.command import (
+    EO_GROUPS,
+    HIS_SETTINGS,
+    MIX_GROUPS,
+    MODES,
+    Choices,
+    chosen_lam,
+    command_line,
+    his_defaults,
+    p_by_lam,
+    parse_ids,
+    solve_args,
+)
 
 SETTINGS = DATA_DIR / "ui_settings.json"
 TEAM_JSON = UPSTREAM_DIR / "data" / "team.json"  # where his bookmarklet's team goes (docs/weekly-run.md)
@@ -35,6 +47,7 @@ def save_choices(c: Choices) -> None:
 
 
 def form(saved: Choices) -> Choices:
+    """The sidebar. Raises ValueError for an entry that can't be read (shown above the command)."""
     st.sidebar.header("Team")
     team_id = st.sidebar.text_input("FPL team id", saved.team_id)
     team_json = st.sidebar.checkbox(
@@ -42,14 +55,22 @@ def form(saved: Choices) -> Choices:
     )
     if team_json and not TEAM_JSON.exists():
         st.sidebar.warning("No team.json yet: save it from the bookmarklet (docs/weekly-run.md, step 3) or untick this box.")
-    horizon = st.sidebar.number_input("Weeks to plan (0 = his settings file)", 0, 15, saved.horizon or 0)
 
     st.sidebar.header("Rank goal")
     mode = st.sidebar.radio("Mode", list(MODES), list(MODES).index(saved.mode), format_func=MODES.get)
-    eo, target, lam, points, kappa = saved.eo, saved.target, saved.lam, saved.points, saved.kappa
+    eo, mix, target, lam, points, kappa = saved.eo, saved.mix, saved.target, saved.lam, saved.points, saved.kappa
     eo_decay, eo_drift = saved.eo_decay, saved.eo_drift
     if mode != "plain":
-        eo = st.sidebar.selectbox("Ownership (EO) from", EO_GROUPS, EO_GROUPS.index(saved.eo))
+        eo = st.sidebar.selectbox(
+            "Ownership (EO) from", EO_GROUPS, EO_GROUPS.index(saved.eo), format_func=lambda g: "Custom mix" if g == "mix" else g
+        )
+        if eo == "mix":
+            cols = st.sidebar.columns(2)
+            mix = {
+                g: cols[i % 2].number_input(f"{g} weight", 0.0, 1.0, float(saved.mix.get(g, 0.0)), step=0.05, key=f"mix_{g}")
+                for i, g in enumerate(MIX_GROUPS)
+            }
+            st.sidebar.caption("Weights are scaled to add up to 1. The line's drift uses the AE64/E64 part only.")
         if mode == "target":
             target = st.sidebar.number_input("Target rank", 1, 10_000_000, saved.target, step=1000)
         else:
@@ -65,23 +86,65 @@ def form(saved: Choices) -> Choices:
             eo_decay = st.number_input("λ decay a GW (--eo_decay; 0 = next GW only)", 0.0, 1.0, saved.eo_decay, step=0.1)
             eo_drift = st.checkbox("EO drifts towards wildcard templates (--eo_drift)", saved.eo_drift)
         sims = st.number_input("Simulations (0 = off)", 0, 500, saved.sims, step=10)
-        extra = st.text_input("Extra solver flags", saved.extra, placeholder='--banned "[123]" --use_wc "[8]"')
+
+    st.sidebar.header("Sertalp's settings")
+    st.sidebar.caption("Filled in from his settings files; only what you change is passed on.")
+    if mode == "target":
+        st.sidebar.caption("With a target the solver runs once per λ (9 solves), so the time limit applies to each.")
+    his, errors = his_settings(saved.his)
+    extra = st.sidebar.text_input("Any other flags of his", saved.extra, placeholder='--booked_transfers "[...]"')
+    if errors:
+        raise ValueError("; ".join(errors))
 
     return Choices(
         team_id=team_id,
         team_json=team_json,
         mode=mode,
         eo=eo,
+        mix=mix,
         target=int(target),
         lam=float(lam),
         points=points,
         kappa=kappa,
         eo_decay=float(eo_decay),
         eo_drift=eo_drift,
-        horizon=int(horizon) or None,
         sims=int(sims),
+        his=his,
         extra=extra,
     )
+
+
+def his_settings(saved: dict) -> tuple[dict, list[str]]:
+    """One expander per section of HIS_SETTINGS, starting from what was last used. Returns what differs from his
+    files, and any entries that can't be read."""
+    defaults = his_defaults()
+    changed, errors = {}, []
+    for section, settings in HIS_SETTINGS.items():
+        with st.sidebar.expander(section, expanded=section == "Solve"):
+            for key, label, kind in settings:
+                default = defaults.get(key)
+                now = saved.get(key, default)
+                w = f"his_{key}"
+                try:
+                    if kind == "int":
+                        value = int(st.number_input(label, value=int(now or 0), step=1, key=w))
+                    elif kind == "float":
+                        value = float(st.number_input(label, value=float(now or 0), step=0.01, format="%.3f", key=w))
+                    elif kind == "bool":
+                        value = st.checkbox(label, bool(now), key=w)
+                    elif kind == "gws":
+                        value = parse_ids(st.text_input(label, ", ".join(str(x) for x in now or []), key=w))
+                    elif kind == "int?":
+                        text = st.text_input(label, "" if now is None else str(now), key=w).strip()
+                        value = int(text) if text else None
+                    else:
+                        value = st.text_input(label, str(now or ""), key=w).strip()
+                except ValueError as e:
+                    errors.append(f"{label}: {e}")
+                    continue
+                if value != default:
+                    changed[key] = value
+    return changed, errors
 
 
 def run(args: list[str], box) -> tuple[int, str]:
@@ -125,10 +188,10 @@ def main() -> None:
     st.set_page_config(page_title="Risky Solver", layout="wide")
     st.title("Risky Solver")
     st.caption("Fills in `fplrank solve` and runs it on this PC. Solio files and team.json go where docs/weekly-run.md says.")
-    choices = form(load_choices())
     try:
+        choices = form(load_choices())
         args = solve_args(choices)
-    except ValueError as e:  # a bad team id, or unbalanced quotes in the extra flags
+    except ValueError as e:  # a bad team id or list of GWs, or unbalanced quotes in the extra flags
         st.error(str(e))
         return
     st.markdown("**What the button runs**")
