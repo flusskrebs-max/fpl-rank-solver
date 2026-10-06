@@ -37,6 +37,12 @@ from fplrank.paths import DATA_DIR, UPSTREAM_DIR
 INPUTS = ("fair", "repick", "drift", "banked")  # (a)-(d); (e) templates enter by expected wildcard share
 STEP = 0.05  # weight grid
 OUT_DIR = DATA_DIR / "derived" / "eo_blend"
+# Captain herding (`herd_captains`), set from 2025-26's pattern before scoring 2026-27 (eo-blend.md). HERD_CONC:
+# median top-captain share per group (eo-patterns-2025-26.md §5); groups not listed (top 1k/10k herd much less) are
+# not herded. HERD_TAU: a 0.5-point xP lead gives the top captain 84% of the herd, a 1-point lead 97%.
+HERD_CONC = {"AE64": 0.97, "E64": 0.91}
+HERD_TAU = 0.3
+HERD_MIN_XI = 0.25  # captain candidates: in at least a quarter of the group's XIs
 
 
 # ---------------------------------------------------------------------------- inputs (a) and (b)
@@ -81,6 +87,73 @@ def repick_rows(rows: pd.DataFrame, xp: pd.Series) -> pd.DataFrame:
     for _, r in rows.groupby("entry_id", sort=False):
         x = xp.reindex(r["fpl_id"]).fillna(0.0).to_numpy(float)
         out.append(r.assign(multiplier=lineup(r["element_type"].to_numpy(), x)))
+    return pd.concat(out, ignore_index=True)
+
+
+def next_gw_eo(picks: pd.DataFrame, gw: int, xp: pd.Series, conc: float | None = None) -> tuple[pd.Series, int]:
+    """A group's GW `gw` EO forecast (fpl_id -> fraction) and the GW of the picks it starts from.
+
+    The method eo-blend.md found best: fair persistence (a) from the group's latest picks before `gw`, XI and
+    captain re-picked on `xp` (GW `gw` xP) with no transfers (b), and with `conc` (the group's `HERD_CONC`) the
+    armband herded (`herd_captains`). `picks` holds one group's managers only.
+    """
+    last = int(picks.loc[picks["gw"] < gw, "gw"].max())
+    rows = repick_rows(fair_rows(picks, last), xp)
+    if conc is not None:
+        rows = herd_captains(rows, xp, conc)
+    eo = rows.groupby("fpl_id")["multiplier"].sum() / rows["entry_id"].nunique()
+    return eo[eo > 0].rename("eo"), last
+
+
+def herd_captains(
+    rows: pd.DataFrame, xp: pd.Series, conc: float = 0.94, tau: float = HERD_TAU, min_xi: float = HERD_MIN_XI
+) -> pd.DataFrame:
+    """(b) with the armband herded onto the group's consensus captain (eo-patterns-2025-26.md §5).
+
+    The elite concentrate the armband far harder than "everyone captains their own highest xP": in 2025-26 one
+    captain took 97% (AE64) and 91% (E64) of the armbands in a median week, splitting only when the top two
+    premiums were close, and managers who don't own him buy him. So: candidates are the players in at least
+    `min_xi` of the group's re-picked XIs, c1 and c2 the two with the highest xP, q = 1 / (1 + exp(-(xP1 - xP2) /
+    tau)). Every manager's armband goes conc x q to c1, conc x (1 - q) to c2 and 1 - conc to their own re-picked
+    captain. A manager who doesn't start c1 (or c2) buys him with that probability, starting him in place of
+    their lowest-xP starter in his position. Multipliers are expected ones, so they can be fractional; `captain`
+    is the expected armband.
+    """
+    xi = rows[rows["multiplier"] >= 1]
+    share = xi.groupby("fpl_id")["entry_id"].nunique() / rows["entry_id"].nunique()
+    x = xp.reindex(share.index[share >= min_xi]).fillna(0.0).sort_values(ascending=False, kind="stable")
+    if len(x) < 2:
+        return rows
+    q = 1 / (1 + np.exp(-(x.iloc[0] - x.iloc[1]) / tau))
+    pos = rows.drop_duplicates("fpl_id").set_index("fpl_id")["element_type"]
+    out = []
+    for _, r in rows.groupby("entry_id", sort=False):
+        m = r.set_index("fpl_id")["multiplier"].astype(float)
+        typ = r.set_index("fpl_id")["element_type"]
+        cap = (m >= 2) * (1 - conc)
+        m = m.clip(upper=1) + cap
+        for c, a in ((x.index[0], conc * q), (x.index[1], conc * (1 - q))):
+            if m.get(c, 0) < 1:  # buy (or start) him in place of the weakest starter in his position
+                if c not in m:
+                    m[c], typ[c], cap[c] = 0.0, pos[c], 0.0
+                same = m.index[(typ == pos[c]) & (m >= 1) & (m.index != c)]
+                if len(same):
+                    m[xp.reindex(same).fillna(0.0).idxmin()] -= a
+                m[c] += a
+            m[c] += a
+            cap[c] += a
+        ids = m.index
+        out.append(
+            pd.DataFrame(
+                {
+                    "entry_id": r["entry_id"].iloc[0],
+                    "fpl_id": ids,
+                    "element_type": typ[ids].to_numpy(),
+                    "multiplier": m.to_numpy(),
+                    "captain": cap[ids].to_numpy(),
+                }
+            )
+        )
     return pd.concat(out, ignore_index=True)
 
 
@@ -137,9 +210,10 @@ def surges(prev_own: pd.Series, now_own: pd.Series, base_own: pd.Series | None =
 
 
 def top_captain(rows: pd.DataFrame) -> tuple[int, float]:
-    """(fpl_id, share of managers) of the most-captained player; captain = the multiplier-2+ pick."""
-    cap = rows[rows["multiplier"] >= 2]
-    counts = cap["fpl_id"].value_counts()
+    """(fpl_id, share of managers) of the most-captained player: the multiplier-2+ pick, or `herd_captains`'
+    expected armband."""
+    cap = rows["captain"] if "captain" in rows else rows["multiplier"].ge(2).astype(float)
+    counts = cap.groupby(rows["fpl_id"]).sum().sort_values(ascending=False)
     return int(counts.index[0]), counts.iloc[0] / rows["entry_id"].nunique()
 
 
@@ -201,11 +275,12 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
         path = nf._projection_for(gw)
         xp = _xp(path, gw)
         fair = fair_rows(picks, gw - 1)
+        repick = repick_rows(fair, xp)
         src[gw] = {
             "actual": deadline[deadline["gw"] == gw],
             "persistence": deadline[deadline["gw"] == gw - 1],
             "fair": fair,
-            "repick": repick_rows(fair, xp),
+            "repick": repick,
             "banked": solved[(solved["gw"] == gw) & (solved["variant"] == "banked")],
             "xp": xp,
             "ev": nf.future_ev(pd.read_csv(path, encoding="utf-8-sig"), gw, 5),
@@ -214,7 +289,7 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
     def group_inputs(gw, ids, group):
         """Group-level (own, eo) frames x100 on one fixed player set, per source and drift k."""
         s = src[gw]
-        t = {n: _table(s[n], ids) for n in ("actual", "persistence", "fair", "repick", "banked")}
+        t = {n: _table(s[n], ids) for n in ("actual", "persistence", "fair", "repick", "herd", "banked")}
         drift = {k: nf.cheap_forecast(t["fair"], s["ev"], pos, k) for k in nf.KS}
         t["templates"] = templates[(templates["group"] == group) & (templates["gw"] == gw)][["fpl_id", "own", "eo"]]
         c = cheap_k[(cheap_k["group"] == group) & (cheap_k["gw"] == gw)].iloc[0]
@@ -234,6 +309,9 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
     rows, weights, surge_rows, captain_rows, mats = [], [], [], [], {g: {} for g in nf.GROUPS}
     for group in nf.GROUPS:
         ids = set(members.loc[members["group"] == group, "entry_id"])
+        for gw in gws:  # herding is per group (some managers are in both), so set for this group's pass
+            s = src[gw]
+            s["herd"] = herd_captains(s["repick"][s["repick"]["entry_id"].isin(ids)], s["xp"], HERD_CONC[group])
         share = {gw: wc.loc[(wc["gw"] == gw) & wc["entry_id"].isin(ids), "entry_id"].nunique() / len(ids) for gw in gws}
         cases = {}
         for gw in gws:
@@ -297,7 +375,7 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
                     ].nunique()
                     surge_rows.append({"group": group, "gw": gw, "freehit_prev": fh, **surges(prev, own["actual"], own["fair"])})
                     cap = {}
-                    for name in ("actual", "persistence", "fair", "repick", "banked"):
+                    for name in ("actual", "persistence", "fair", "repick", "herd", "banked"):
                         r = src[gw][name]
                         r = r[r["entry_id"].isin(sub)]
                         r = r.assign(multiplier=r["multiplier"].clip(upper=2)) if name == "actual" else r
@@ -311,7 +389,7 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
                 set().union(
                     *(
                         set(src[gw][n].loc[src[gw][n]["entry_id"].isin(ids), "fpl_id"])
-                        for n in ("actual", "persistence", "fair", "repick", "banked")
+                        for n in ("actual", "persistence", "fair", "repick", "herd", "banked")
                     )
                 )
             )
@@ -322,10 +400,17 @@ def backtest(log=print) -> dict[str, pd.DataFrame]:
                 .fillna(0)
                 .to_numpy()
                 * 100
-                for n in ("actual", "persistence", "fair", "repick", "banked")
+                for n in ("actual", "persistence", "fair", "repick", "herd", "banked")
             }
 
-    pairs = (("banked", "persistence"), ("banked", "fair"), ("banked", "repick"), ("repick", "fair"), ("fair", "persistence"))
+    pairs = (
+        ("banked", "persistence"),
+        ("banked", "fair"),
+        ("banked", "repick"),
+        ("repick", "fair"),
+        ("fair", "persistence"),
+        ("herd", "repick"),
+    )
     boot = pd.concat([bootstrap(mats[g], pairs=pairs).assign(group=g) for g in nf.GROUPS])
     out = {
         "blend_table": pd.DataFrame(rows),

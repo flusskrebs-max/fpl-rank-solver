@@ -7,7 +7,8 @@
 
 His flags (horizon, use_wc, banned, team_id, ...) and his settings files are passed to his
 `run/solve.py::solve_regular` unchanged. With `--eo`, his projections are read as usual and scaled by
-xP x (1 + λ x (EO - 1)) for the next GW only (`opt.ownership`), once per λ. The plan with the best
+xP x (1 + λ x (EO - 1)) for the next GW only (`opt.ownership`), once per λ. A collector group's EO is its
+managers' latest squads re-picked on his next-GW xP (`ownership.repick_eo`). The plan with the best
 P(reaching the target line) (`opt.rank_goal`) is printed with his normal output under a short λ block.
 
 `--sims N` then does what his `run/simulations.py` does, at the chosen λ: N runs of `solve_regular` with
@@ -168,7 +169,7 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
         if lam == 0.0:
             runs[lam] = run(theirs, request=request, quiet=True)
             gw = next_gw(runs[lam].options, request(BOOTSTRAP))
-            eo, eo_text = load_eo(group, request(BOOTSTRAP), gw)
+            eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, runs[lam].projections)
         else:
             runs[lam] = run(
                 theirs, lambda proj, _, lam=lam, eo=eo, gw=gw: ownership.adjust_projections(proj, eo, lam, gw), request, quiet=True

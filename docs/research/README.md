@@ -9,7 +9,8 @@ What we know, newest findings first. Scope: the EO projection and the λ choice;
 persistence*. On 2026-27 GW2-5 that cuts persistence's EO error by 14% (AE64) and 11% (E64). Re-picking each
 manager's XI and captain on their current squad from next-GW xP does much better: EO error 7.3 (AE64) and 5.8
 (E64) points against 11.6 and 8.5 for persistence, and slightly better than running Sertalp's solver on every
-manager's squad (7.9, 6.1). That re-pick is the next thing to wire into `--eo` (EO1b). What the per-manager solve
+manager's squad (7.9, 6.1). `--eo` now uses that re-pick (EO1b), with the armband herded onto the consensus
+captain as the elite do (E64 EO error 5.8 to 5.2, AE64 unchanged at 7.3). What the per-manager solve
 still adds is transfers: it catches more of the 20+ point ownership moves. Four transitions only, so treat the
 numbers as a first look. Details: [eo-blend.md](eo-blend.md), [eo-naive-field.md](eo-naive-field.md).
 

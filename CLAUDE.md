@@ -69,7 +69,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 - `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
 - `src/fplrank/opt/ownership.py`: S1 weighting. `adjust_projections(proj, eo, lam, lam_gw)`, `score_plan` (EV, EO held,
-  exposure), EO loaders (`load_eo`, `load_solio_eo`, `pick_eo`), `rank_goal_table` (used by `fplrank solve`).
+  exposure), EO loaders (`load_eo`, `load_solio_eo`, `pick_eo`; `repick_eo` = next-GW EO from re-picked squads with
+  the armband herded, what `--eo` uses), `rank_goal_table` (used by `fplrank solve`).
 - `src/fplrank/rank/target.py`: S2a. `line_drift(rank, group)` (the gap's drift against the EO group) and
   `target_line(rank)` (indicative absolute line for the report); `uv run python -m fplrank.rank.target 10000`.
 - `src/fplrank/opt/rank_goal.py`: S2c. `plan_moments`, `choose_lambda` (P of reaching the target line per λ); `src/fplrank/model/variance.py`: S2b v(xP) table.

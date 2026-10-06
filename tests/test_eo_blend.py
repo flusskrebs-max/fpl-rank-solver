@@ -79,3 +79,40 @@ def test_bootstrap_full_sample_gain():
 def test_surges_count_moves_and_those_left_after_a_base():
     prev, now, base = pd.Series([0.0, 50, 10]), pd.Series([30.0, 20, 10]), pd.Series([25.0, 25, 10])
     assert eb.surges(prev, now, base) == {"rises": 1, "falls": 1, "still_vs_base": 0}
+
+
+def _group(n_c1: int, xp_lead: float):
+    """Four managers on the same 15 (ids 1-15) except that the first `n_c1` swap forward 15 for forward 99."""
+    picks = pd.concat([_picks(e, 3, [*range(1, 15), 99 if e <= n_c1 else 15]) for e in range(1, 5)])
+    xp = pd.Series(1.0, index=[*range(1, 16), 99])
+    xp[[8, 13, 14]] = [6.0, 5.0, 4.0]  # 8 a midfielder; 13, 14 forwards
+    xp[99] = 6.0 + xp_lead
+    return eb.repick_rows(eb.fair_rows(picks, 3), xp), xp
+
+
+def test_herd_concentrates_the_armband_and_buys_the_captain():
+    rows, xp = _group(n_c1=2, xp_lead=2.0)  # half own 99, who is 2 points clear of 8
+    herd = eb.herd_captains(rows, xp, conc=0.9)
+    assert herd.groupby("entry_id")["multiplier"].sum().round(9).eq(12).all()  # 11 starters and one armband
+    assert herd.groupby("entry_id")["captain"].sum().round(9).eq(1).all()
+    pid, share = eb.top_captain(herd)
+    assert pid == 99 and share > 0.85
+    assert eb.top_captain(rows)[1] == 0.5  # re-pick: half captain 99, half 8
+    eo = herd.groupby("fpl_id")["multiplier"].sum() / 4
+    assert eo[99] > 1.7  # the non-owners buy him, for their weakest forward (14)
+    assert eo[14] < 0.6
+
+
+def test_herd_splits_when_the_top_two_are_close():
+    rows, xp = _group(n_c1=4, xp_lead=0.0)  # everyone owns 8 and 99, level on xP
+    herd = eb.herd_captains(rows, xp, conc=1.0)
+    cap = herd.groupby("fpl_id")["captain"].sum() / 4
+    assert cap[99] == pytest.approx(0.5) and cap[8] == pytest.approx(0.5)
+
+
+def test_next_gw_eo_uses_the_latest_picks_before_the_gw():
+    picks = pd.concat([_picks(1, 2, list(range(1, 16))), _picks(1, 3, list(range(1, 16)), chip="3xc")])
+    xp = pd.Series(1.0, index=range(1, 16))
+    xp[13] = 9.0  # a forward: the re-picked captain
+    eo, last = eb.next_gw_eo(picks, 4, xp)
+    assert last == 3 and eo[13] == 2 and eo.sum() == 12
