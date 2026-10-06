@@ -45,11 +45,13 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 
 ## Where things are
 
-- `src/fplrank/baseline.py`: `solve_ev(my_data, projections, bootstrap, fixtures, options)` runs the
-  upstream EV model through his own `run/solve.py::solve_regular` (projections written to his `data/fplrank.csv`,
-  his settings files + runtime options, API payloads from our snapshots). Every rank-objective idea is compared against this.
+- Scope: we build only the EO projection and the λ choice. Sertalp's solver does the rest (team, projections,
+  settings, solve, simulations) through `fplrank solve`; don't rebuild any of that on our side.
+- `src/fplrank/cli.py`: `fplrank solve`. His `solve_regular` with his flags; `--eo/--target/--lam` scale his projections
+  on read (next GW only), solve per λ, pick the best P(target) and print his output for that plan; `--sims N` runs
+  his simulations + sensitivity summary at that λ. `src/fplrank/upstream.py`: imports/patches his code.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
-  season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections),
+  season files),
   `elite.py` (elite-group EO, meta tables and 2025-26 squad ownership from `datasets/elite_ownership/`;
   unlisted EO = censored, not zero),
   `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
@@ -67,21 +69,14 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   2025-26 against an empirical benchmark (`docs/research/scenario-calibration.md`).
 - `docs/tasks/TASKS.md` (the queue, grouped by release), `docs/tasks/log.md` (dated notes), `docs/tasks/briefs/`
   (open briefs); `docs/briefs/` (finished briefs); `docs/pm/pm-handover.md` (PM context); `docs/data-log.md` (what data we have and first findings).
-- `docs/weekly-run.md`: Alex's pre-deadline steps (update, register Solio files, run S1).
+- `docs/weekly-run.md`: Alex's pre-deadline steps (update, Solio files, team via his bookmarklet, `fplrank solve`).
 - `scripts/elite64/`: Cowork's original 2025-26/2026-27 dataset scripts, kept as written (not linted).
 - `datasets/`: small committed datasets (free/public sources only); see `datasets/README.md`.
-- `src/fplrank/opt/ownership.py`: S1 ownership-weighted solve. `adjust_projections(proj, eo, lam)`,
-  `solve_with_ownership(...)`, `sweep(...)` (plans per λ with EV, EV cost, EO held, exposure);
-  CLI `uv run python -m fplrank.opt.ownership --team <id> --eo AE64|E64|top1000 --sweep` (live API).
+- `src/fplrank/opt/ownership.py`: S1 weighting. `adjust_projections(proj, eo, lam, lam_gw)`, `score_plan` (EV, EO held,
+  exposure), EO loaders (`load_eo`, `load_solio_eo`, `pick_eo`), `rank_goal_table` (used by `fplrank solve`).
 - `src/fplrank/rank/target.py`: S2a. `line_drift(rank, group)` (the gap's drift against the EO group) and
   `target_line(rank)` (indicative absolute line for the report); `uv run python -m fplrank.rank.target 10000`.
-- `src/fplrank/opt/rank_goal.py`: S2c. `plan_moments`, `choose_lambda` (P of reaching the target line per λ);
-  CLI: add `--target-rank 10000 [--points N]` to the S1 command. `src/fplrank/model/variance.py`: S2b v(xP) table.
-- `src/fplrank/weekly.py`: R1. `uv run python -m fplrank.weekly --team <id> --target 10000` runs S1 + S2c and writes
-  `reports/GW{n}.md` (git-ignored). `run(Inputs(...), mode)`: mode `optimum` (R1) or `simulate` (R2, not built).
-- `src/fplrank/cli.py`: `fplrank solve`. His `solve_regular` with his flags; `--eo/--target/--lam` scale his projections
-  on read (next GW only), solve per λ, pick the best P(target) and print his output for that plan.
-- `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
+- `src/fplrank/opt/rank_goal.py`: S2c. `plan_moments`, `choose_lambda` (P of reaching the target line per λ); `src/fplrank/model/variance.py`: S2b v(xP) table.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
 - `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (thinking; `data-sources.md` = which
   data we use and why),
@@ -93,11 +88,9 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 uv sync --group dev
 uv run pytest                 # all tests; -m "not slow" skips real solves
 uv run ruff check . && uv run ruff format .
-uv run python scripts/smoke_baseline.py
 uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
 uv run python -m fplrank.collect.elite_picks collect [--top N]     # FPL API: Alex's PC only
-uv run python -m fplrank.opt.ownership --team <id> --eo AE64 --sweep  # S1 plans per λ (live API)
-uv run fplrank solve --team_id <id> --eo AE64 --target 10000      # his solve.py + λ choice (his flags pass through)
+uv run fplrank solve --team_id <id> --eo AE64 --target 10000 [--sims 50]  # his solve.py + λ choice (his flags pass through)
 ```
 
 ## Conventions

@@ -48,7 +48,7 @@ The normal approximation is too crude for FPL's lumpy, fat-tailed scores, but it
 
 1. **Sample average approximation (SAA).** Draw S scenarios; a binary per scenario is 1 only when
    you beat the threshold in that scenario; maximise their share. Exact in the limit, but big-M
-   formulations relax badly. Spike (`src/fplrank/opt/toy.py`): 12 players, choose 4, 400 scenarios
+   formulations relax badly. Spike (`src/fplrank/opt/toy.py`, removed 2026-10-06; in git history): 12 players, choose 4, 400 scenarios
    took 20 to 40 s in HiGHS. The real problem is ~600 players over several GWs, so this will not
    scale as is.
 2. **LP-friendly risk surrogates.** Optimise mean relative score plus or minus λ × a linear risk

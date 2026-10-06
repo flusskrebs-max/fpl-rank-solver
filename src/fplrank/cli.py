@@ -26,8 +26,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from fplrank.baseline import _patched, _solve_module
 from fplrank.opt import ownership
+from fplrank.upstream import patched, solve_module
 
 BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
 
@@ -63,7 +63,7 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime
     quiet: capture what he prints in `Run.output` instead of printing it.
     runtime_options: handed to `solve_regular` the way his simulations script does.
     """
-    solve = _solve_module()
+    solve = solve_module()
     from dev import data_parser, solver
 
     seen, solved = {}, []
@@ -85,9 +85,9 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime
     sys.argv = ["solve.py", *argv]
     try:
         with (
-            _patched(solve, solve_multi_period_fpl=keep, **requests),
-            _patched(solver, read_data=read_hook, **requests),
-            _patched(data_parser, **requests),
+            patched(solve, solve_multi_period_fpl=keep, **requests),
+            patched(solver, read_data=read_hook, **requests),
+            patched(data_parser, **requests),
             contextlib.redirect_stdout(out) if quiet else contextlib.nullcontext(),
         ):
             solve.solve_regular(runtime_options)
@@ -103,7 +103,7 @@ def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None) -> Non
     The runs go one at a time in this process (his default of 1 process) so `adjust` applies to each. His
     results folder is left as is; only the plans these runs saved are copied out and summarised.
     """
-    solve = _solve_module()
+    solve = solve_module()
     import sensitivity
 
     results = solve.DATA_DIR / "results"

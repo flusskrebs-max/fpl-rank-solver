@@ -1,1 +1,1 @@
-"""Optimisation formulations. The EV baseline lives in fplrank.baseline; rank-objective models go here."""
+"""Our two extras on top of Sertalp's solver: the ownership weighting (λ) and the λ choice from a rank goal."""

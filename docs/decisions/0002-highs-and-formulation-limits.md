@@ -8,7 +8,7 @@ Upstream moved from sasoptpy to building models directly with `highspy` (HiGHS's
 2026. HiGHS is free, fast for LP and MILP, and solves convex continuous QP, but has no mixed-integer
 QP. Rank objectives naturally involve variance, which is quadratic in the squad decisions.
 
-The toy spike (`fplrank.opt.toy`) shows a sample-average-approximation probability objective works
+The toy spike (`fplrank.opt.toy`, removed 2026-10-06; in git history) shows a sample-average-approximation probability objective works
 in HiGHS but is slow even when tiny (12 binaries, 400 scenarios: 20 to 40 s), because big-M
 scenario constraints have weak LP relaxations.
 

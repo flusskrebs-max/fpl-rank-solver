@@ -67,3 +67,32 @@ def test_sims_run_his_simulations_at_the_fixed_lambda(request_fn, capsys):
     assert "--- Sertalp's simulations: 2 runs ---" in out
     assert "Processing for GW 6 with wildcard." in out  # his sensitivity summary (preseason wildcard)
     assert "Number of plans: 2" in out and "Goalkeepers:" in out
+
+
+@pytest.mark.slow
+def test_lambda_flips_the_captain_to_the_field_pick(request_fn):
+    """λ through his own solve: a captain slightly worse on xP but heavily captained by the field wins at λ = 0.1."""
+    from fplrank.opt import ownership
+
+    def captain(sol):
+        rows = sol["picks"][sol["picks"]["week"] == 6]
+        return int(rows.loc[rows["captain"] == 1, "id"].iloc[0])
+
+    base = cli.run(HIS_FLAGS, request=request_fn, quiet=True).solution
+    rows = base["picks"][base["picks"]["week"] == 6]
+    cap = captain(base)
+    other = int(rows[(rows["lineup"] == 1) & (rows["captain"] == 0)].sort_values("xP")["id"].iloc[-1])
+    eo = pd.Series({cap: 0.3, other: 1.6})
+
+    def solve(lam):
+        def adjust(proj, _):
+            proj = proj.copy()
+            top = proj["6_Pts"].max() + 1  # make the EV captain clear, the field's pick 0.2 behind
+            proj.loc[proj["ID"] == cap, "6_Pts"] = top
+            proj.loc[proj["ID"] == other, "6_Pts"] = top - 0.2
+            return ownership.adjust_projections(proj, eo, lam, 6)
+
+        return cli.run(HIS_FLAGS, adjust, request_fn, quiet=True).solution
+
+    assert captain(solve(0.0)) == cap
+    assert captain(solve(0.1)) == other
