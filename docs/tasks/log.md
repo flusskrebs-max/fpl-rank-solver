@@ -57,3 +57,15 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
 - 2026-10-06: ADR 0004 (accepted by Alex): keep S1's xP adjustment, equivalent to the community "risk" term `w·EO·xP`
   plus a (1 − λ) rescaling; no vendor changes. New S1d (`--eo solio`) blocked on a Solio export with EO; S1c on hold.
+- 2026-10-06: PRs #15-17 merged (plan v2, C0, S2a).
+- 2026-10-06, C1: collector `[sampled]` sets; `top10k` = every 10th of ranks 1-10,000. First run started on Alex's PC.
+- 2026-10-06, S1b: `projections.from_ep_next(bootstrap, fixtures, horizon)` and S1 `--projections ep_next` (also the
+  automatic fallback when no Solio file is registered); offline test on a saved real GW6 team (`tests/fixtures/gw6_live/`)
+  checks λ = 0 equals `solve_ev`. Finding: `ep_next` is FPL's form-based estimate, not a projection (Groß 15.5 for GW6,
+  so the plan captains him); fine for tests and history, not for real decisions.
+- 2026-10-06, S1d: `--eo solio` reads Solio's per-GW EO forecast (matched to FPL ids by name + team) and S1 now takes
+  a different EO per GW. Live GW6 sweep on the rank-1 team: EV plan for λ -0.1..0.1, Haaland captain for λ ≥ 0.2 (cost 3.4).
+- 2026-10-06, W1: `docs/weekly-run.md`, the pre-deadline steps on Alex's PC.
+- 2026-10-06, collector fix (with C1): FPL's picks endpoint shows the team after automatic subs once a GW is played, so
+  EO was post-sub (João Pedro GW5 AE64 0% instead of 6%). `deadline_picks` swaps auto-subs back; EO tables rebuilt.
+  LiveFPL `/EO` (all players, top 10k + overall, current GW) is the manual cross-check; no history or per-manager data.

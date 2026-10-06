@@ -3,6 +3,25 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-06: Solio EO forecast (GW6-24)
+
+- Alex's Solio "effective ownership" export (`data/projections/solio_eo/`, paid, never committed):
+  `Name, Team, Price, Avg EO %, GW6 EO % ... GW24 EO %`, 562 players, no FPL ids. All 562 match FPL ids
+  on web name (accents ignored) + team; prices agree. GW6 total 1203% (≈ 12 per manager), 128 players > 0.
+- Against our GW5 EO (all players): correlation 0.89 with top1000 and E64, 0.77 with AE64, 0.90 with
+  overall `selected_by_percent`; mean absolute gap over Solio's top 40: top1000 12, E64 15, AE64 20 points.
+  (These comparisons used EO built after automatic subs, since fixed; João Pedro's "0%" in the elite
+  groups was that bug.) Alex: Solio's EO is overall ownership. It is a forecast for the broad field,
+  e.g. João Pedro 69% for GW6 = the ~61% still holding him plus those who had him in their XI.
+- It is a multi-GW forecast, so S1 can use a different EO per GW (`--eo solio`, S1d).
+
+## 2026-10-06: FPL `ep_next` is a form measure, not a projection
+
+- For GW6 (bootstrap before the deadline) the highest `ep_next` values are Groß 15.5, Schade 12.0, Bogle
+  10.0, Kostoulas 10.0: recent points per game, not expected points. So a solve on `ep_next` captains Groß.
+  vaastav `xP` is FPL's `ep_this`, the same measure, which is why the two correlate so well.
+- Consequence: `ep_next` is fine as S1's offline/test fallback and as a like-for-like xP for past seasons
+  (S2b, B04b, banded by quantile), but not as a projection for real decisions. Use Solio for those.
 ## 2026-10-06: Top-10k sample collected; EO now from the deadline XI
 
 - First run of the `top10k` set (every 10th of ranks 1-10,000, 1,000 managers, GW1-5): 56 min for all
