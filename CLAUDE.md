@@ -46,7 +46,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 ## Where things are
 
 - `src/fplrank/baseline.py`: `solve_ev(my_data, projections, bootstrap, fixtures, options)` runs the
-  upstream EV model with in-memory inputs. Every rank-objective idea is compared against this.
+  upstream EV model through his own `run/solve.py::solve_regular` (projections written to his `data/fplrank.csv`,
+  his settings files + runtime options, API payloads from our snapshots). Every rank-objective idea is compared against this.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
   season files), `offline.py` (rebuild API-shaped inputs from history; placeholder projections),
   `elite.py` (elite-group EO, meta tables and 2025-26 squad ownership from `datasets/elite_ownership/`;

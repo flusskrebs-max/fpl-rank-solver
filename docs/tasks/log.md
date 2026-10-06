@@ -82,3 +82,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
   recommended plan, P(target) vs the EV plan, EV cost, two nearest alternatives, full sweep. Loud warning on `ep_next`.
   S1 CLI helpers shared (`pick_projections`, `pick_eo`, `rank_goal_table`). `run(Inputs, mode)` harness; `--mode simulate`
   reserved for R2 (upstream's `randomized` noise, plan in the brief). Not yet run live.
+- 2026-10-06, CLI 1/4: `solve_ev` now runs every solve through Sertalp's `solve_regular` (as simulations.py does): λ-adjusted
+  projections go in as his `data/fplrank.csv`, his settings files apply, his solutions come back. Our own prep/solve calls removed.
