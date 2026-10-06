@@ -74,3 +74,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
   dwarfs a 4-GW plan's effect), matching the review's "a few points, not tens" check. Ties go to λ near 0.
 - 2026-10-06, V1: realised spread vs S2's sd on GW1-5: ratio 0.97-0.99 (top 1000, top 10k), 0.82-0.86 (AE64, E64),
   all within 20%, so s = 1. Report: `docs/research/realised-spread.md` (with drift by group).
+- 2026-10-06, S1c: `--eo-forecast` (B04 one-step forecast as deadline EO) and λ on the next GW only by default
+  (`--lam-all-gws` keeps the old behaviour).

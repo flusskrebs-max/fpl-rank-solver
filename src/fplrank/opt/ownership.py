@@ -11,6 +11,9 @@ EO = 1 is a scale choice, not a neutral point: it keeps adjusted values near raw
 *which* players are picked rather than how keen the solver is on hits. (For variance, owning a player
 once is neutral at EO 0.5 and captaining him at EO 1.5.)
 
+The CLI applies λ to the first GW of the horizon only by default (`lam_gw`): that is the GW being
+decided now, and EO further out is much less certain. Later GWs use raw xP.
+
 Every plan is then scored on the raw projections: its EV, its EV cost against λ = 0, how much of the
 field's EO it holds, and its exposure (xP-weighted distance from the field), which S2 will use.
 
@@ -18,6 +21,7 @@ Run on Alex's PC (needs the live FPL API):
 
     uv run python -m fplrank.opt.ownership --team <id> --eo AE64 --lam 0 0.1 0.2
     uv run python -m fplrank.opt.ownership --team <id> --eo top1000 --sweep
+    uv run python -m fplrank.opt.ownership --team <id> --eo AE64 --eo-forecast --sweep
 """
 
 import argparse
@@ -100,11 +104,14 @@ def eo_for(eo: pd.Series | pd.DataFrame, gw: int) -> pd.Series:
     return eo[max(cols)]
 
 
-def adjust_projections(projections: pd.DataFrame, eo: pd.Series | pd.DataFrame, lam: float) -> pd.DataFrame:
-    """Scale every `{gw}_Pts` column by (1 + lam x (EO - 1)), with that GW's EO (see `eo_for`)."""
+def adjust_projections(projections: pd.DataFrame, eo: pd.Series | pd.DataFrame, lam: float, lam_gw: int | None = None) -> pd.DataFrame:
+    """Scale every `{gw}_Pts` column by (1 + lam x (EO - 1)), with that GW's EO (see `eo_for`).
+
+    With `lam_gw`, only that GW's column is scaled; the others keep raw xP.
+    """
     out = projections.copy()
     for col in out.columns:
-        if m := _PTS.match(col):
+        if (m := _PTS.match(col)) and lam_gw in (None, int(m[1])):
             out[col] = out[col] * (1 + lam * (out["ID"].map(eo_for(eo, int(m[1]))).fillna(0.0) - 1))
     return out
 
@@ -159,9 +166,13 @@ def solve_with_ownership(
     bootstrap: dict,
     fixtures: list[dict],
     options: dict | None = None,
+    lam_gw: int | None = None,
 ) -> dict:
-    """EV solve on λ-adjusted projections; returns upstream's best solution plus `score_plan` metrics."""
-    adjusted = adjust_projections(projections, eo, lam)
+    """EV solve on λ-adjusted projections; returns upstream's best solution plus `score_plan` metrics.
+
+    `lam_gw`: apply λ to that GW only (see `adjust_projections`); None applies it to every GW.
+    """
+    adjusted = adjust_projections(projections, eo, lam, lam_gw)
     solution = solve_ev(my_data, adjusted, bootstrap, fixtures, options)[0]
     hit_cost = (options or {}).get("hit_cost", 4)
     return {**solution, "lam": lam, **score_plan(solution, projections, eo, hit_cost)}
@@ -177,14 +188,14 @@ def plan_key(solution: dict) -> tuple:
     return xi, bench, cap, solution["buy"], solution["sell"], solution["chip"]
 
 
-def sweep(my_data, projections, eo, bootstrap, fixtures, lams=SWEEP, options=None) -> tuple[pd.DataFrame, dict]:
+def sweep(my_data, projections, eo, bootstrap, fixtures, lams=SWEEP, options=None, lam_gw=None) -> tuple[pd.DataFrame, dict]:
     """Solve for each λ; returns one row per distinct plan (with the λ values giving it) and the solutions.
 
     Plans are the same if they do the same thing this GW (`plan_key`); a merged row shows the figures of
     its λ closest to 0. ev_cost is the EV given up against the λ = 0 plan (solved even if 0 is not in `lams`).
     """
     lams = sorted(set(lams) | {0.0})
-    solutions = {lam: solve_with_ownership(my_data, projections, eo, lam, bootstrap, fixtures, options) for lam in lams}
+    solutions = {lam: solve_with_ownership(my_data, projections, eo, lam, bootstrap, fixtures, options, lam_gw) for lam in lams}
     base_ev = solutions[0.0]["ev"]
     rows = {}
     for lam in sorted(lams, key=abs):
@@ -198,6 +209,21 @@ def sweep(my_data, projections, eo, bootstrap, fixtures, lams=SWEEP, options=Non
     table = pd.DataFrame(sorted(rows.values(), key=lambda r: min(r["lams"])))
     table["lams"] = table["lams"].map(lambda ls: ", ".join(f"{x:g}" for x in sorted(ls)))
     return table, solutions
+
+
+def forecast_eo(group: str, next_gw: int, model=None, table: pd.DataFrame | None = None) -> pd.Series:
+    """S1c: the B04 one-step forecast of `group`'s EO at the `next_gw` deadline (`eo_mean`), fpl_id -> EO.
+
+    The collector's EO for a GW exists only after its deadline, so this is the EO we would see at it.
+    Chips are not forecast (none assumed). Needs the group's data for next_gw - 1 and a registered
+    Solio file for next_gw.
+    """
+    from fplrank.model import ownership as dyn
+
+    model = dyn.fit_default() if model is None else model
+    state = dyn.state_for(group, next_gw, table, chips_known=False)
+    fc = dyn.forecast_eo(group, next_gw, state, model)
+    return fc.set_index("fpl_id")["eo_mean"].astype(float)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -235,6 +261,12 @@ def _main(argv=None):
     p.add_argument("--lam", type=float, nargs="+", help="one or more λ values")
     p.add_argument("--sweep", action="store_true", help=f"λ in {SWEEP}")
     p.add_argument(
+        "--eo-forecast",
+        action="store_true",
+        help="EO = the ownership model's forecast for the next deadline (B04), not last GW's collected EO",
+    )
+    p.add_argument("--lam-all-gws", action="store_true", help="apply λ to every GW of the horizon (default: the next GW only)")
+    p.add_argument(
         "--projections",
         help="Solio CSV, or 'ep_next' for FPL's free projections (default: newest Solio file registered for the next GW, else ep_next)",
     )
@@ -244,8 +276,8 @@ def _main(argv=None):
     p.add_argument("--points", type=int, help="S2: our total points now (default: from the FPL API)")
     p.add_argument("--drift-group", help="S2: collector group for the line's drift (default: --eo if AE64/E64, else AE64)")
     p.add_argument("--kappa", type=float, default=0.3, help="S2: share of our projected edge over the field taken as real")
+    sys.stdout.reconfigure(encoding="utf-8")  # player names and λ on the Windows console
     args = p.parse_args(argv)
-    sys.stdout.reconfigure(encoding="utf-8")  # player names on the Windows console
 
     my_data, bootstrap, fixtures = _live_inputs(args.team)
     next_gw = next(e["id"] for e in bootstrap["events"] if e["is_next"])
@@ -260,21 +292,28 @@ def _main(argv=None):
         projections = proj_store.from_ep_next(bootstrap, fixtures, args.horizon)
     else:
         projections = pd.read_csv(path, encoding="utf-8-sig")
+    if args.eo_forecast and args.eo == "solio":
+        p.error("--eo-forecast forecasts a collected group's EO; Solio's export is already a forecast")
     if args.eo == "solio":
         eo = load_solio_eo(bootstrap)
         first = eo_for(eo, next_gw)
         eo_text = (
             f"Solio forecast GW{min(eo.columns)}-{max(eo.columns)} (GW{next_gw}: {int((first > 0).sum())} players, total {first.sum():.1f})"
         )
+    elif args.eo_forecast:
+        eo = forecast_eo(args.eo, next_gw)
+        eo_text = f"{args.eo} forecast for the GW{next_gw} deadline, repeated ({int((eo > 0.005).sum())} players, total {eo.sum():.1f})"
     else:
         eo, eo_gw = load_eo(args.eo, next_gw - 1)
-        eo_text = f"{args.eo} GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
-    print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {eo_text}")
+        eo_text = f"{args.eo} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"
+    lam_gw = None if args.lam_all_gws else next_gw
+    lam_text = "every GW" if lam_gw is None else f"GW{next_gw} only"
+    print(f"GW{next_gw} plan, horizon {args.horizon}; projections {path}; EO {eo_text}; λ on {lam_text}")
 
     lams = SWEEP if args.sweep or not args.lam else args.lam
     options = {"horizon": args.horizon, "secs": args.secs}
     with contextlib.redirect_stdout(io.StringIO()):  # upstream prints a lot per solve
-        table, solutions = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options)
+        table, solutions = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options, lam_gw)
     with pd.option_context("display.width", 200, "display.max_colwidth", 60):
         print(table.to_string(index=False))
     if args.target_rank:
