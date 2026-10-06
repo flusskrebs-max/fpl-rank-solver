@@ -82,3 +82,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   recommended plan, P(target) vs the EV plan, EV cost, two nearest alternatives, full sweep. Loud warning on `ep_next`.
   S1 CLI helpers shared (`pick_projections`, `pick_eo`, `rank_goal_table`). `run(Inputs, mode)` harness; `--mode simulate`
   reserved for R2 (upstream's `randomized` noise, plan in the brief). Not yet run live.
+- 2026-10-06, S1 CLI: ran S1c live on Alex's PC (team 157924, GW6), fine; Alex's failure was the literal `<id>` in PowerShell.
+  Added a progress line per λ (about 30-40s each, so a full sweep is ~5 min). Odd: λ = -0.2 beat λ = 0 on 5-GW EV (-0.91), so
+  the λ = 0 solve isn't reaching the optimum; not yet looked at.
