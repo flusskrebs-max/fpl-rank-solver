@@ -12,8 +12,8 @@ EO = 1 is a scale choice, not a neutral point: it keeps adjusted values near raw
 once is neutral at EO 0.5 and captaining him at EO 1.5.)
 
 `fplrank solve` (cli.py) applies λ in full to the first GW of the horizon (`lam_gw`), the GW being decided
-now, and λ x d^k to the GW k weeks later (`decay`, `--eo_decay`, default `EO_DECAY`). The same next-GW EO is
-used for every GW, so this equals shrinking later GWs' EO towards 1. Sertalp's `decay_base` then discounts the
+now, and λ x d^k to the GW k weeks later (`decay`, `--eo_decay`, default `EO_DECAY`), each GW with its own EO
+(`repick_eo`: drifting from the field's squads now towards wildcard squads). Sertalp's `decay_base` then discounts the
 scaled xP in his objective, so the EO term falls by (decay_base x d) a GW, always faster than xP; d = 0 is λ on
 the next GW only. Each plan is then scored on the raw projections (`score_plan`) and the λ chosen by
 P(reaching the target line) (`rank_goal_table`).
@@ -31,6 +31,11 @@ SWEEP = (-0.3, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.3)
 # data alone asks: we re-solve every week with fresh EO, so a later GW's EO only matters through this week's
 # transfers, and it keeps a plan from chasing EO it can't act on yet. See docs/research/eo-horizon.md.
 EO_DECAY = 0.7
+# Later-GW EO (`repick_eo` with templates). Share of the 8-GW ownership move made after k GWs, 2025-26 elite
+# (eo-patterns-2025-26.md §1; k = 5 and 7 interpolated), and the size of that move: mean |own(t + 8) - own(t)|
+# in points, players 5%+ owned. Groups without 2025-26 data (top 1k/10k) use E64's, the closer of the two.
+DRIFT_SHARE = (0.0, 0.27, 0.48, 0.64, 0.77, 0.85, 0.93, 0.965, 1.0)
+DRIFT_8 = {"AE64": 24.8, "E64": 20.5}
 _PTS = re.compile(r"^(\d+)_Pts$")
 
 
@@ -216,15 +221,24 @@ def score_plan(solution: dict, projections: pd.DataFrame, eo: pd.Series, hit_cos
 # used by `fplrank solve` (cli.py)
 
 
-def repick_eo(group: str, next_gw: int, xp: pd.Series | pd.DataFrame, collected_dir=COLLECTED_DIR) -> tuple[pd.Series | pd.DataFrame, int]:
+def drift_share(k: int) -> float:
+    """Share of the 8-GW ownership move made k GWs ahead (`DRIFT_SHARE`; 1 from k = 8 on)."""
+    return DRIFT_SHARE[min(max(k, 0), len(DRIFT_SHARE) - 1)]
+
+
+def repick_eo(
+    group: str, next_gw: int, xp: pd.Series | pd.DataFrame, collected_dir=COLLECTED_DIR, templates: pd.DataFrame | None = None
+) -> tuple[pd.Series | pd.DataFrame, int]:
     """GW `next_gw` EO forecast for `group` from the collector's picks, as fpl_id -> EO, and the GW of the picks.
 
-    The method `docs/research/eo-blend.md` found best: each manager's latest squad with chips taken out, XI and
-    captain re-picked on `xp` (fpl_id -> next-GW xP) with no transfers, and for AE64/E64 the armband herded onto
-    the consensus captain (`model.eo_blend.herd_captains`). `elite` is the `group_weights` mix of its groups.
+    The method `docs/research/eo-blend.md` found best: each manager's latest squad with chips taken out (a free hit
+    reverts to the squad before it), XI and captain re-picked on `xp` (fpl_id -> next-GW xP) with no transfers, and
+    for AE64/E64 the armband herded onto the consensus captain (`model.eo_blend.herd_captains`). `elite` is the
+    `group_weights` mix of its groups.
 
-    With `xp` a frame (fpl_id x GW), the same squads are re-picked on each GW's xP: one EO column per GW, so a
-    later GW's EO has that GW's captain, not next GW's.
+    With `xp` a frame (fpl_id x GW), the same is done on each GW's xP: one EO column per GW, so a later GW's EO
+    has that GW's captain, not next GW's. With `templates` (template, fpl_id, element_type: a few wildcard squads
+    solved now), the field drifts towards them as well (`_drift_rows`).
     """
     from fplrank.model import eo_blend
 
@@ -236,20 +250,60 @@ def repick_eo(group: str, next_gw: int, xp: pd.Series | pd.DataFrame, collected_
         p = picks[picks["entry_id"].isin(members.loc[members["set"] == g, "entry_id"])]
         if p.empty or p["gw"].min() >= next_gw:
             raise ValueError(f"No collected picks for {g!r} before GW{next_gw}")
-        for gw in frame.columns:
-            eo, last = eo_blend.next_gw_eo(p, next_gw, frame[gw], eo_blend.HERD_CONC.get(g))
-            cols.setdefault(gw, []).append(eo * w)
+        if templates is None:
+            for gw in frame.columns:
+                eo, last = eo_blend.next_gw_eo(p, next_gw, frame[gw], eo_blend.HERD_CONC.get(g))
+                cols.setdefault(gw, []).append(eo * w)
+        else:
+            last = int(p.loc[p["gw"] < next_gw, "gw"].max())
+            for gw, eo in _drift_rows(eo_blend.fair_rows(p, last), templates, g, next_gw, frame).items():
+                cols.setdefault(gw, []).append(eo * w)
         gws.append(last)
     out = pd.DataFrame({gw: pd.concat(parts, axis=1).fillna(0.0).sum(axis=1) for gw, parts in cols.items()}).fillna(0.0)
     return (out if isinstance(xp, pd.DataFrame) else out[next_gw].rename("eo")), min(gws)
 
 
-def pick_eo(group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame | None = None) -> tuple[pd.Series | pd.DataFrame, str]:
+def _drift_rows(rows: pd.DataFrame, templates: pd.DataFrame, group: str, next_gw: int, xp: pd.DataFrame) -> dict[int, pd.Series]:
+    """Each GW's EO for one group whose squads now are `rows` (eo_blend.fair_rows), drifting towards `templates`.
+
+    GW next_gw + k: a share a x drift_share(k) of the group holds a template squad, the rest their squads now; all
+    XIs and captains re-picked on that GW's xP and herded, with the herd's c1/c2 split pulled towards even by
+    drift_share(k) (the projected top captain is the field's only about half the time a few weeks out). a sets the
+    8-GW move to the group's `DRIFT_8`: a = DRIFT_8 / mean |template ownership - ownership now| (players 5%+ owned
+    in either), at most 1. Next GW (k = 0) is exactly `eo_blend.next_gw_eo`.
+    """
+    from fplrank.model import eo_blend
+
+    n = rows["entry_id"].nunique()
+    tm = templates.assign(entry_id=-1 - templates["template"], multiplier=0)[rows.columns]
+    nt = tm["entry_id"].nunique()
+    own_now = rows.groupby("fpl_id")["entry_id"].nunique() / n
+    own_tm = tm.groupby("fpl_id")["entry_id"].nunique() / nt
+    both = pd.concat([own_now, own_tm], axis=1).fillna(0.0)
+    moved = both[both.max(axis=1) >= 0.05].diff(axis=1).iloc[:, 1].abs().mean() * 100
+    a = min(1.0, DRIFT_8.get(group, DRIFT_8["E64"]) / moved) if moved > 0 else 0.0
+    conc = eo_blend.HERD_CONC.get(group)
+    out = {}
+    for gw in xp.columns:
+        s = drift_share(gw - next_gw)
+        r = eo_blend.repick_rows(pd.concat([rows, tm]) if a * s else rows, xp[gw])
+        if conc is not None:
+            r = eo_blend.herd_captains(r, xp[gw], conc, q_shrink=s)
+        weight = r["entry_id"].map(lambda e, share=a * s: share / nt if e < 0 else (1 - share) / n)
+        eo = (r["multiplier"] * weight).groupby(r["fpl_id"]).sum()
+        out[gw] = eo[eo > 0]
+    return out
+
+
+def pick_eo(
+    group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame | None = None, templates=None
+) -> tuple[pd.Series | pd.DataFrame, str]:
     """EO for `group` (a collector group, or 'solio') and a one-line description of it.
 
     With `projections` (his, as read) holding next-GW xP and the collector's picks on disk, a collector group's
     EO is `repick_eo`'s forecast, one column per GW from next GW on (squads as now, XI and captain re-picked on
-    each GW's xP); otherwise its latest chip-free EO, repeated (`load_eo`).
+    each GW's xP); otherwise its latest chip-free EO, repeated (`load_eo`). `templates`: a callable returning
+    wildcard squads (see `repick_eo`), called only when there are later GWs; the field then drifts towards them.
     """
     if group == "solio":
         eo = load_solio_eo(bootstrap)
@@ -261,13 +315,15 @@ def pick_eo(group: str, bootstrap: dict, next_gw: int, projections: pd.DataFrame
         try:
             xp = projections.set_index("ID")[[c for c in projections.columns if (m := _PTS.match(c)) and int(m[1]) >= next_gw]]
             xp = xp.rename(columns=lambda c: int(c.split("_")[0])).fillna(0.0)
-            eo, eo_gw = repick_eo(group, next_gw, xp)
+            tm = templates() if templates is not None and len(xp.columns) > 1 else None
+            eo, eo_gw = repick_eo(group, next_gw, xp, templates=tm)
         except (FileNotFoundError, ValueError) as e:
             print(f"EO re-pick not possible ({e}); using the collected EO, repeated")
         else:
             first = eo[next_gw]
             players = int((first > 0).sum())
-            text = f"{group} GW{eo_gw} squads re-picked on each GW's xP (GW{next_gw}: {players} players, total {first.sum():.1f})"
+            how = f"drifting towards {tm['template'].nunique()} wildcard squads" if tm is not None else "re-picked on each GW's xP"
+            text = f"{group} GW{eo_gw} squads, {how} (GW{next_gw}: {players} players, total {first.sum():.1f})"
             return eo, text
     eo, eo_gw = load_eo(group, next_gw - 1)
     return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"

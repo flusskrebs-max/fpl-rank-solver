@@ -9,7 +9,8 @@ His flags (horizon, use_wc, banned, team_id, ...) and his settings files are pas
 `run/solve.py::solve_regular` unchanged. With `--eo`, his projections are read as usual and scaled by
 xP x (1 + λ_k x (EO - 1)), λ_k = λ x d^k for the GW k weeks after the next (`--eo_decay` d, default 0.7; 0 = next GW
 only), once per λ (`opt.ownership`). A collector group's EO is its
-managers' latest squads re-picked on his next-GW xP (`ownership.repick_eo`). The plan with the best
+managers' latest squads re-picked on each GW's xP, drifting on later GWs towards three wildcard squads solved now with
+his solver (`wildcard_templates`, `ownership.repick_eo`; `--eo_drift false` to keep squads as now). The plan with the best
 P(reaching the target line) (`opt.rank_goal`) is printed with his normal output under a short λ block.
 
 `--sims N` then does what his `run/simulations.py` does, at the chosen λ: N runs of `solve_regular` with
@@ -130,6 +131,25 @@ def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None) -> Non
             del sensitivity.input
 
 
+TEMPLATE_HORIZONS = (3, 5, 8)  # as naive_field's templates (eo-blend.md (e))
+TEMPLATE_SECS = 120  # time limit for each: a rough target, so near-optimal is plenty
+
+
+def wildcard_templates(argv: list[str], gw: int, request=None) -> pd.DataFrame:
+    """Where the field drifts to: his solver run with a wildcard in GW `gw` on our team (budget and all) at horizons
+    3, 5 and 8, other chips off, on his raw projections, at most `TEMPLATE_SECS` each. Returns (template, fpl_id,
+    element_type) for each GW `gw` squad.
+    """
+    out = []
+    for i, h in enumerate(TEMPLATE_HORIZONS):
+        chips = {"use_wc": [gw], "use_bb": [], "use_fh": [], "use_tc": []}
+        r = run(argv, request=request, quiet=True, runtime_options={**chips, "horizon": h, "secs": TEMPLATE_SECS})
+        p = r.solution["picks"]
+        p = p[(p["week"] == gw) & (p["squad"] == 1)]
+        out.append(pd.DataFrame({"template": i, "fpl_id": p["id"].astype(int), "element_type": p["type"].astype(int)}))
+    return pd.concat(out, ignore_index=True)
+
+
 def next_gw(options: dict, bootstrap: dict) -> int:
     """The GW he plans from: his `override_next_gw`, else FPL's next event."""
     if options.get("override_next_gw"):
@@ -152,6 +172,12 @@ def parser() -> argparse.ArgumentParser:
         type=float,
         default=ownership.EO_DECAY,
         help=f"λ's decay a GW after the next one, on top of his decay_base (default {ownership.EO_DECAY:g}; 0 = next GW only)",
+    )
+    p.add_argument(
+        "--eo_drift",
+        type=lambda v: v.lower() in ("true", "1", "yes", "on"),
+        default=True,
+        help="later GWs' EO drifts towards three wildcard solves (default true; false = squads as now)",
     )
     p.add_argument("--sims", type=int, help="then run his simulations N times at the chosen λ and print his summary")
     return p
@@ -177,7 +203,10 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
         if lam == 0.0:
             runs[lam] = run(theirs, request=request, quiet=True)
             gw = next_gw(runs[lam].options, request(BOOTSTRAP))
-            eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, runs[lam].projections)
+            templates = None
+            if ours.eo_drift and ours.eo_decay:
+                templates = lambda gw=gw: wildcard_templates(theirs, gw, request)  # noqa: E731
+            eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, runs[lam].projections, templates=templates)
         else:
             runs[lam] = run(
                 theirs,

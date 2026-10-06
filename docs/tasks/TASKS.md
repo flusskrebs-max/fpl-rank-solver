@@ -20,7 +20,8 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 |---|---|---|---|
 | CLEAN | Bug check and spring clean: dead code out, docs consolidated | (none) | DONE (PR #41) |
 | RG1 | P(target) inputs from the data: line spread and drift against the group over full seasons, κ 0.75 (`--kappa`) | (none; `docs/research/rank-goal-inputs.md`) | DONE (PR #43) |
-| EOH | λ on every GW of the horizon, λ x d^k with `--eo_decay` d (default 0.7); later GWs' EO re-picked on their own xP | (none; `docs/research/eo-horizon.md`) | IN REVIEW (PR #44) |
+| EOH | λ on every GW of the horizon, λ x d^k with `--eo_decay` d (default 0.7); later GWs' EO re-picked on their own xP | (none; `docs/research/eo-horizon.md`) | DONE (PR #44) |
+| EOL | Later-GW EO drifts towards three wildcard solves on last season's drift curve; captain split evened out further ahead (`--eo_drift`) | (none; `docs/research/eo-horizon.md`) | IN REVIEW (PR #45) |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags | (to write) | TODO |
 
@@ -37,7 +38,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 
 - Transfers in the EO forecast (ownership moves): the per-manager solve catches more of them than the re-pick
   (`docs/research/eo-blend.md`); worth it only if the re-pick misses big moves in use.
-- Multi-GW EO (λ beyond the next GW); wildcard templates weighted by the expected wildcard share; fallers continuing
+- Wildcard templates weighted by the expected wildcard share for next GW; fallers continuing
   (`docs/research/eo-patterns-2025-26.md`).
 - `LIVE_WEIGHT` in `opt/ownership.py`: move `--eo elite` weight onto today's top 10k as ranks settle.
 - Value function V(gap, GWs left, chips), rollout and policy backtests: a later check on S2's normal

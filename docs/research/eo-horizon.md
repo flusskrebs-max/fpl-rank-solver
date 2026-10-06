@@ -57,3 +57,43 @@ Line 398 after GW5, we have 358, gap 80 ± 42 over 33 GWs. GW6 moves; EV over th
 
 One team, one GW: no conclusion about d beyond "0.7 avoids the d = 1 blow-up and changes plans at the margin".
 The 2025-26 replay (RP1) is where to test it properly.
+
+## Later-GW EO: drift towards wildcard squads (EOL, 2026-10-06)
+
+Before this, a later GW's EO was the field's squads *as now*, XI and captain re-picked on that GW's xP: nobody ever
+transferred. Now (`ownership.repick_eo` with templates, default in `fplrank solve`; `--eo_drift false` for the old one):
+
+- **Target**: three wildcard solves on our team (his solver, `use_wc` next GW, horizons 3/5/8, other chips off, raw
+  projections, 120 s each; `cli.wildcard_templates`). Our budget, not the group's mean: close enough for a target.
+- **Path**: GW next + k, a share a x w(k) of each group holds a template squad, the rest their squads now. w(k) is
+  last season's ownership drift as a share of the 8-GW move (0, 0.27, 0.48, 0.64, 0.77, 0.85, 0.93, 0.965, 1; k = 5
+  and 7 interpolated, eo-patterns-2025-26.md §1). a makes the 8-GW move the size it was: a = DRIFT_8 / mean
+  |template ownership - ownership now| over players 5%+ owned in either, with DRIFT_8 = 24.8 points (AE64), 20.5
+  (E64, also used for top 1k/10k). For team 157924's run, a was about 0.7.
+- **XI and captain** re-picked per GW and herded as before; the herd's split between the top two captains is pulled
+  towards 50/50 by w(k), since the projected top captain is the field's only about half the time a few weeks out.
+- **Free hits** revert: the field's squads are already chip-free (a free hit counts as the squad before it).
+- **Next GW is unchanged** (k = 0: exactly the old re-pick).
+
+### Team 157924, top 10k, `--eo elite`, Solio GW6 file, horizon 8, his settings with `--secs 180`
+
+| | chosen λ | P(top 10k) at chosen / EV plan | P at λ = -0.3 / +0.3 | GW6 moves at the chosen λ |
+|---|---|---|---|---|
+| squads as now | -0.05 | 38% / 38% | 37% / 35% | Saka, Gonzalo, Hill, De Cuyper in; Isak, Wirtz, Calafiori, Konsa out |
+| drift (new) | -0.05 | 29% / 28% | 28% / 25% | the same |
+
+- **The plan doesn't change**: same λ and the same GW6-GW11 moves (lineup xP differs by 0.1-0.2 a GW). With
+  λ x 0.7^k on top of decay_base, GW7+ EO carries little weight in the solve, so this was expected.
+- **P falls by about 10 points.** Our projected edge over the field over the 8 GWs drops from 14.3 to 8.7 points
+  (field xP GW6-13 465.2 → 470.8), because the field now upgrades towards wildcard squads; `season_moments` then
+  extends the horizon's average edge to all 33 GWs left, so 5.6 points become about 17 on the mean. The drift
+  is the more honest picture (the field does transfer), but it also shows how much P leans on that extrapolation.
+- EO by GW (Haaland, the elite's GW7 captain): 1.98 → 1.82 at GW7, 1.97 → 1.59 at GW9; Gonzalo 0.06 → 0.75 and
+  Szoboszlai 0.75 → 0.18 by GW13 (in all three templates / sold in them).
+
+### Limits
+
+- a puts the whole calibrated move on the template players. Real drift is more spread out (managers buy different
+  players), so template players' EO is probably too high later on and everyone else's change too small.
+- One team, one week, capped solves (λ = -0.05 shows a higher EV than λ = 0, so the λ = 0 solve stopped short).
+- Three extra solves a run (up to 6 minutes). Not run when `--eo_decay 0` or `--eo solio`.
