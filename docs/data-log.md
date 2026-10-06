@@ -3,6 +3,13 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-06: FPL-Core-Insights 2025-26 loaded (D1)
+
+- `fplrank.data.core_insights.playerstats("2025-26")`: 29,978 rows, GW1-38, 752-841 players a GW.
+- Offset check of `ep_next` against vaastav `xP` (summed per player-GW) on the 11 GWs with both: the
+  gw = N row matches GW N best (r 0.92-0.97, mean absolute gap 0.19-0.45 from GW2 on; gw = N-1 gives
+  0.83-0.95). GW1 is the exception (r 0.40), so treat GW1 as unreliable. `xp_from_ep_next` uses gw = N.
+
 ## 2026-10-06: Data sources review
 
 - vaastav has stopped weekly updates; its 2025-26 `xP` is filled only for GWs 1-6, 8, 9, 24, 29 and 38.

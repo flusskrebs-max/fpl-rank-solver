@@ -53,3 +53,4 @@ One line per finished task or decision from now on; detail belongs in the PR and
   with past lines interpolated from collected managers' overall ranks. GW2-5: top 10k vs AE64 +2.4 a GW, vs E64 +4.1,
   vs top1000 -10.0 (biased: today's top 1000 were selected for scoring well). `target_line(rank)` (report only):
   line now + GWs left x past seasons' pace; after GW5 top 10k 398 now, ~2589 ± 95 at GW38.
+- 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
