@@ -52,7 +52,10 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   `elite.py` (elite-group EO, meta tables and 2025-26 squad ownership from `datasets/elite_ownership/`;
   unlisted EO = censored, not zero),
   `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
-  files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
+  files in `data/projections/`; `latest(gw)` = newest file made at or before a GW),
+  `team_state.py` (`load_team_state(team_id, request, api)` = solver `my_data`: exact from the logged-in
+  my-team endpoint when `FPL_EMAIL`/`FPL_PASSWORD` or `FPL_ACCESS_TOKEN` are set in env or `.env`, else
+  upstream's public estimate with a warning; setup in `docs/team-login.md`; never log credentials).
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
   the B01 long shape. Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).

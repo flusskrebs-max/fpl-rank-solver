@@ -32,7 +32,7 @@ import sys
 
 import pandas as pd
 
-from fplrank.baseline import _patched, _upstream, solve_ev
+from fplrank.baseline import solve_ev
 from fplrank.paths import COLLECTED_DIR
 
 SWEEP = (-0.3, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.3)
@@ -232,6 +232,7 @@ def forecast_eo(group: str, next_gw: int, model=None, table: pd.DataFrame | None
 
 def _live_inputs(team_id: int):
     from fplrank.data.fpl_api import FplApi
+    from fplrank.data.team_state import load_team_state
 
     api = FplApi()
     cache = {}
@@ -242,9 +243,7 @@ def _live_inputs(team_id: int):
             cache[endpoint] = api.get(endpoint)
         return cache[endpoint]
 
-    solver = _upstream()
-    with _patched(solver, cached_request=request):
-        my_data = solver.generate_team_json(team_id, {})
+    my_data = load_team_state(team_id, request, api)  # exact when logged in, else a warned public estimate
     return (
         my_data,
         request("https://fantasy.premierleague.com/api/bootstrap-static/"),
