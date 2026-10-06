@@ -23,7 +23,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 | EOH | λ on every GW of the horizon, λ x d^k with `--eo_decay` d (default 0.7); later GWs' EO re-picked on their own xP | (none; `docs/research/eo-horizon.md`) | DONE (PR #44) |
 | EOL | Later-GW EO drifts towards three wildcard solves on last season's drift curve; captain split evened out further ahead (`--eo_drift`) | (none; `docs/research/eo-horizon.md`) | DONE (PR #45) |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
-| CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags (`uv run fplrank page`) | (none) | IN REVIEW |
+| CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags (`uv run fplrank page`) | (none) | IN REVIEW (PR #46) |
 
 ## v0.4 Better EO
 
