@@ -4,7 +4,7 @@ import pytest
 
 from fplrank import cli
 from fplrank.opt import ownership
-from fplrank.ui.command import HIS_SETTINGS, Choices, chosen_lam, command_line, his_defaults, p_by_lam, parse_ids, solve_args
+from fplrank.ui.command import HIS_SETTINGS, Choices, chosen_lam, command_line, his_defaults, p_by_lam, parse_ids, progress, solve_args
 
 
 def test_target_run():
@@ -64,3 +64,9 @@ def test_his_settings_exist_in_his_files():
     assert parse_ids("8, 10 12") == [8, 10, 12] and parse_ids(" ") == []
     with pytest.raises(ValueError):
         parse_ids("8, Salah")
+
+
+def test_progress_lines():
+    assert progress("  3/9: λ = -0.1 solved in 12s\n") == (3, 9, "λ 3/9 solved (last: λ = -0.1)")
+    assert progress("  4/50 done (30s)") == (4, 50, "simulation 4/50 done")
+    assert progress("Running HiGHS 1.15.1") is None

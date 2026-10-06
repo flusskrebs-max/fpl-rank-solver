@@ -162,3 +162,16 @@ def p_by_lam(output: str) -> dict[float, float]:
 def chosen_lam(output: str) -> float | None:
     m = CHOSEN.search(output)
     return float(m.group(1)) if m else None
+
+
+PROGRESS = re.compile(r"^\s*(\d+)/(\d+)(?:: λ = (\S+) solved| done)")
+
+
+def progress(line: str) -> tuple[int, int, str] | None:
+    """(done, out of, label) from the CLI's "  3/9: λ = -0.1 solved in 12s" and "  4/50 done (30s)" lines."""
+    m = PROGRESS.match(line)
+    if not m:
+        return None
+    done, total = int(m[1]), int(m[2])
+    what = f"λ {done}/{total} solved (last: λ = {m[3]})" if m[3] else f"simulation {done}/{total} done"
+    return done, total, what

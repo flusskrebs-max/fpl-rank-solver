@@ -25,6 +25,7 @@ from fplrank.ui.command import (
     his_defaults,
     p_by_lam,
     parse_ids,
+    progress,
     solve_args,
 )
 
@@ -90,7 +91,10 @@ def form(saved: Choices) -> Choices:
     st.sidebar.header("Sertalp's settings")
     st.sidebar.caption("Filled in from his settings files; only what you change is passed on.")
     if mode == "target":
-        st.sidebar.caption("With a target the solver runs once per λ (9 solves), so the time limit applies to each.")
+        st.sidebar.caption(
+            "With a target the solver runs once per λ (9 solves), plus 3 wildcard solves for the EO drift, so the time limit"
+            " applies to each."
+        )
     his, errors = his_settings(saved.his)
     extra = st.sidebar.text_input("Any other flags of his", saved.extra, placeholder='--booked_transfers "[...]"')
     if errors:
@@ -147,8 +151,9 @@ def his_settings(saved: dict) -> tuple[dict, list[str]]:
     return changed, errors
 
 
-def run(args: list[str], box) -> tuple[int, str]:
-    """`fplrank solve` in its own process, its output shown in `box` as it arrives."""
+def run(args: list[str], box, bar) -> tuple[int, str]:
+    """`fplrank solve` in its own process, its output shown in `box` as it arrives and its λ (or simulation) count in
+    `bar`. The process is stopped if the page stops first (a widget changed, Solve pressed again, the tab closed)."""
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
     proc = subprocess.Popen(
         [sys.executable, "-m", "fplrank.cli", "solve", *args],
@@ -162,10 +167,16 @@ def run(args: list[str], box) -> tuple[int, str]:
         env=env,
     )
     lines = []
-    for line in proc.stdout:
-        lines.append(line)
-        box.code("".join(lines[-40:]), language=None)
-    return proc.wait(), "".join(lines)
+    try:
+        for line in proc.stdout:
+            lines.append(line)
+            if step := progress(line):
+                bar.progress(step[0] / step[1], text=step[2])
+            box.code("".join(lines[-40:]), language=None)
+        return proc.wait(), "".join(lines)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
 
 
 def results(output: str) -> None:
@@ -202,7 +213,8 @@ def main() -> None:
         return
     save_choices(choices)
     with st.status("Solving…", expanded=True) as status:
-        code, output = run(args, st.empty())
+        first = "Solving λ = 0" + (" and the wildcard templates" if choices.mode != "plain" and choices.eo_drift else "")
+        code, output = run(args, st.empty(), st.progress(0.0, text=first))
         status.update(
             label="Done" if code == 0 else f"Stopped with an error (exit code {code})", state="complete" if code == 0 else "error"
         )
