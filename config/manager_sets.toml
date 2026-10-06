@@ -12,3 +12,8 @@ threshold_ranks = [100, 1000, 10000]
 # Hand-maintained lists of team ids. The key becomes the set / EO group name.
 [named_lists]
 # elite64 = [123456, 234567]
+
+# Classic leagues whose members are read from the FPL standings each run. The key becomes the set / EO group name.
+[leagues]
+AE64 = 1291919  # Analytics Elite 64 (64 managers)
+E64 = 38543     # #Elite64 (64 managers; 4 are in both groups)

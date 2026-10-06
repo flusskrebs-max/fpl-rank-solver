@@ -48,6 +48,7 @@ PAYLOADS = {
             ],
         }
     },
+    "leagues-classic/99/standings/?page_standings=1": {"standings": {"has_next": False, "results": [{"entry": 101}, {"entry": 102}]}},
     "entry/101/history/": _history([1, 2], chips=[(1, "bboost")], past=[{"season_name": "2025/26", "total_points": 2600, "rank": 5000}]),
     "entry/101/transfers/": [
         {"element_in": 16, "element_in_cost": 50, "element_out": 15, "element_out_cost": 45, "entry": 101, "event": 2, "time": "t"}
@@ -79,7 +80,7 @@ class FakeApi(FplApi):
 def collected(tmp_path):
     api = FakeApi(tmp_path / "snapshots")
     collector = elite_picks.Collector(api=api, snapshot_dir=tmp_path / "snapshots", out_dir=tmp_path / "out", now=NOW, log=lambda *_: None)
-    config = {"season": "2026-27", "overall_top": [3], "named_lists": {"pair": [101, 102]}, "threshold_ranks": [2]}
+    config = {"season": "2026-27", "overall_top": [3], "named_lists": {"pair": [101, 102]}, "leagues": {"club": 99}, "threshold_ranks": [2]}
     return collector, config, collector.collect(config)
 
 
@@ -102,7 +103,7 @@ def test_tables(collected):
     ranks = pd.read_parquet(out / "ranks.parquet")
     assert ranks.set_index(["entry_id", "gw"])["overall_rank"].to_dict() == {(101, 1): 10, (101, 2): 20, (102, 2): 20}
     members = pd.read_parquet(out / "members.parquet")
-    assert members.groupby("set")["entry_id"].apply(list).to_dict() == {"pair": [101, 102], "top3": [101, 102, 103]}
+    assert members.groupby("set")["entry_id"].apply(list).to_dict() == {"club": [101, 102], "pair": [101, 102], "top3": [101, 102, 103]}
 
 
 def test_eo_is_deadline_eo(collected):
@@ -144,6 +145,7 @@ def test_load_config(tmp_path):
         "season": "2026-27",
         "overall_top": [1000, 10000],
         "named_lists": {"elite": [1, 2]},
+        "leagues": {},
         "threshold_ranks": [],
     }
     assert elite_picks.load_config()["season"] == "2026-27"  # the committed config parses

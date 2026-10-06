@@ -88,6 +88,7 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
         "season": cfg["season"],
         "overall_top": [int(n) for n in cfg.get("overall_top", [])],
         "named_lists": {name: [int(e) for e in ids] for name, ids in cfg.get("named_lists", {}).items()},
+        "leagues": {name: int(league) for name, league in cfg.get("leagues", {}).items()},
         "threshold_ranks": [int(r) for r in cfg.get("threshold_ranks", [])],
     }
 
@@ -128,6 +129,14 @@ class Collector:
             rows += [{"set": f"top{n}", "entry_id": r["entry"], "rank": r["rank"]} for r in results[:n]]
         for name, ids in config["named_lists"].items():
             rows += [{"set": name, "entry_id": e, "rank": None} for e in ids]
+        for name, league in config.get("leagues", {}).items():  # every member of a classic league
+            page = 1
+            while True:
+                standings = self.fetch(_standings_endpoint(page, league), self.max_age)["standings"]
+                rows += [{"set": name, "entry_id": r["entry"], "rank": None} for r in standings["results"]]
+                if not standings["has_next"]:
+                    break
+                page += 1
         members = pd.DataFrame(rows, columns=["set", "entry_id", "rank"]).astype({"entry_id": "int64", "rank": "Int64"})
         members["collected_at"] = self.now.isoformat(timespec="seconds")
         return members
@@ -164,8 +173,8 @@ class Collector:
         return {"managers": len(entries), "failed": failed, "gws": sorted(started), "rows": {k: len(v) for k, v in tables.items()}}
 
 
-def _standings_endpoint(page: int) -> str:
-    return f"leagues-classic/314/standings/?page_standings={page}"
+def _standings_endpoint(page: int, league: int = 314) -> str:
+    return f"leagues-classic/{league}/standings/?page_standings={page}"
 
 
 def _page_for(rank: int) -> int:

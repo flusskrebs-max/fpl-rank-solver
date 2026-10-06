@@ -15,6 +15,7 @@ The repo is the only memory: if it isn't committed, the next session won't know 
 
 **Each session**
 1. Read `docs/tasks/TASKS.md` (the queue) and `docs/pm/pm-handover.md` (context and priorities).
+   Long chats are compacted automatically; anything that must survive goes in these files.
 2. Take the top task that isn't DONE, or ask Alex if the queue is empty or a decision is his.
 3. Finish by updating `TASKS.md` (status + a dated note) and, if anything durable changed,
    `docs/data-log.md`, `docs/decisions/` or the relevant `docs/research/` report.
@@ -28,11 +29,10 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   write pass criteria before looking at test results.
 
 **Building (developer hat)**
-- Delegate well-specified implementation to subagents and pick the model for the job:
-  Sonnet for routine coding, refactors, data plumbing and tests; Opus for design, modelling and
-  calibration work, and for reviewing a subagent's result before it's committed.
-- Give each subagent the brief, the files it may touch and the checks it must pass. Review its diff,
-  run `uv run pytest` and `uv run ruff check .` yourself, then commit.
+- Do the work directly by default. Use subagents only when a job is large, self-contained and
+  clearly cheaper to hand off (they cost more); give them the brief, the files they may touch and the
+  checks, and review their diff before committing.
+- Run `uv run pytest` and `uv run ruff check .` before every commit.
 - One branch and PR per brief. Explain git/GitHub steps to Alex briefly when he needs to act.
 
 **Talking to Alex**

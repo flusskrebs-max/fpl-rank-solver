@@ -11,7 +11,7 @@ ownership, transfer flows, captains and chips, including blanks, doubles and wil
 
 ## Do
 
-1. Merge B04 (only `docs/roadmap.md` conflicts with B03b; keep both sets of lines).
+1. (Done: B04 is merged.)
 2. Refit `forecast_eo` on 2025-26, using `ownership_2025-26.csv` for squad ownership and the transfer
    lists for flows. Projections for last season: vaastav `xP` only exists for 11 GWs of 2025-26, so
    build a simple proxy for every GW (e.g. last-4-GW points per 90 × minutes share × fixture
@@ -22,8 +22,13 @@ ownership, transfer flows, captains and chips, including blanks, doubles and wil
 4. Backtest GW10-38 against listed EO (out of sample by GW), against persistence, separately for
    AE64 and E64, and for normal / double / blank / chip weeks.
 5. Captaincy: refit τ per group on 38 GWs of captain counts.
+6. **Multi-GW** (added 2026-10-06): forecast EO for the next H GWs by applying the one-step model
+   repeatedly with each GW's projections, so S1 can use a per-GW EO over its horizon. Backtest 1-, 3-
+   and 6-GW-ahead error against persistence.
+7. From 2026-10-06 the collector also tracks AE64 and E64 directly (config `leagues`), so this
+   season's elite EO is exact for every player; use it alongside the 2025-26 graphics data.
 
 ## Done when
 
 `docs/research/ownership-dynamics-v0.md` has a 2025-26 section with the backtest table, and the
-model beats persistence overall and in double/blank weeks.
+model beats persistence overall and in double/blank weeks; `forecast_eo` can return several GWs ahead.
