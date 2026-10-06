@@ -92,6 +92,10 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, CLI 4/4: clean-up. Removed what `fplrank solve` covers: `baseline.solve_ev` and `data/offline.py` (our own team and
   projection inputs), the S1 CLI and `sweep` in `opt/ownership.py`, `weekly.py` (R1, superseded), `opt/toy.py` and their tests.
   His solver imports moved to `upstream.py`; the λ captain-flip check now runs through `cli.run`. Docs: one way to run it.
+- 2026-10-06, EO projector 2 (idea 3, naive field): `model/naive_field.py` runs his solver on every AE64/E64 squad (GW2-5, H5,
+  15 s cap, 1ft/2ft/banked/wc; 1,375 solves, 50 min). EO error 36% / 28% below persistence, surge recall 49% / 57%, but ownership
+  error about level: the gain is mostly XI and captain. Alex's cheap blend (EO × EV drift + 3 wildcard templates) ≈ persistence and
+  only a little closer to the per-manager run. Agreed approach recorded in `eo-projector.md`; results in `eo-naive-field.md`.
 - 2026-10-06, `--eo elite`: AE64 and E64 EO averaged, drift against the same average. Collected EO now has last GW's chips
   taken out (TC as a normal captain, BB bench 0, free hitters with the squad they return to); before, GW3's TC/FH week
   read up to 12.6 EO per manager instead of 12. Hook for later: `opt.ownership.LIVE_WEIGHT` (0) blends top10k into `elite`.
