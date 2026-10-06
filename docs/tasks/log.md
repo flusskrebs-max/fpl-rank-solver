@@ -92,3 +92,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, CLI 4/4: clean-up. Removed what `fplrank solve` covers: `baseline.solve_ev` and `data/offline.py` (our own team and
   projection inputs), the S1 CLI and `sweep` in `opt/ownership.py`, `weekly.py` (R1, superseded), `opt/toy.py` and their tests.
   His solver imports moved to `upstream.py`; the λ captain-flip check now runs through `cli.run`. Docs: one way to run it.
+- 2026-10-06, `--eo elite`: AE64 and E64 EO averaged, drift against the same average. Collected EO now has last GW's chips
+  taken out (TC as a normal captain, BB bench 0, free hitters with the squad they return to); before, GW3's TC/FH week
+  read up to 12.6 EO per manager instead of 12. Hook for later: `opt.ownership.LIVE_WEIGHT` (0) blends top10k into `elite`.

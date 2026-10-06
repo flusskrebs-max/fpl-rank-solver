@@ -143,3 +143,41 @@ def test_forecast_eo_returns_eo_mean_by_player(monkeypatch):
     assert set(eo.index) == {1, 2, 3}
     assert eo.sum() == pytest.approx(12.0)  # 11 starters plus one captain, no chips
     assert eo[1] > eo[2] > 0
+
+
+def _picks():
+    """Three managers, two players each in the XI (1 captain) plus player 9 on the bench."""
+    rows = []
+    for entry, gw, chip, cap, xi in [
+        (1, 5, None, 1, (1, 2)),
+        (2, 5, "3xc", 2, (1, 2)),  # TC counts as a normal captain
+        (3, 4, None, 1, (1, 3)),  # the squad manager 3 returns to after the free hit
+        (3, 5, "freehit", 4, (4, 5)),
+        (1, 6, "bboost", 1, (1, 2)),  # bench boost: bench still counts 0
+    ]:
+        for pos, pid in enumerate(xi, 1):
+            rows.append((entry, gw, pid, pos, int(pid == cap), chip))
+        rows.append((entry, gw, 9, 12, 0, chip))
+    return pd.DataFrame(rows, columns=["entry_id", "gw", "fpl_id", "position", "is_captain", "active_chip"])
+
+
+def test_chip_free_eo_drops_tc_bb_and_free_hit():
+    members = pd.DataFrame({"set": "AE64", "entry_id": [1, 2, 3]})
+    eo = ow.chip_free_eo(_picks(), members, "AE64").set_index(["gw", "fpl_id"])["eo"]
+    # GW5: manager 3 counts with their GW4 squad (1 C, 3), not the free hit
+    assert eo[5].to_dict() == pytest.approx({1: 5 / 3, 2: 1.0, 3: 1 / 3})
+    assert eo[6].to_dict() == {1: 2.0, 2: 1.0}
+
+
+def test_elite_is_the_mix_of_ae64_and_e64(tmp_path, monkeypatch):
+    members = pd.DataFrame({"set": ["AE64", "AE64", "E64", "top10k"], "entry_id": [1, 2, 3, 3]})
+    members.to_parquet(tmp_path / "members.parquet")
+    picks = _picks()
+    picks[picks["gw"] == 5].to_parquet(tmp_path / "picks.parquet")
+    # E64 (manager 3) only has a free hit at GW5 and no earlier squad, so falls back to the graphics
+    monkeypatch.setattr("fplrank.data.elite.load_eo", lambda *a: pd.DataFrame({"gw": [5], "group": ["E64"], "fpl_id": [7], "eo": [0.5]}))
+    eo, gw = ow.load_eo("elite", 5, collected_dir=tmp_path)
+    assert gw == 5 and eo.to_dict() == pytest.approx({1: 0.75, 2: 0.75, 7: 0.25})
+    assert ow.group_weights("elite", 0.4) == pytest.approx({"AE64": 0.3, "E64": 0.3, "top10k": 0.4})
+    assert ow.group_weights("elite") == {"AE64": 0.5, "E64": 0.5}  # the live blend is off by default
+    assert ow.drift_group("elite") == "elite"
