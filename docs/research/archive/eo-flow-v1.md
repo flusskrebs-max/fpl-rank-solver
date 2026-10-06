@@ -1,5 +1,7 @@
 # EO flow model v1 (idea 1): result (2026-10-06)
 
+> Archived 2026-10-06. Result: fails. `src/fplrank/model/eo_flow.py` was removed in the spring clean (it is in git history before that PR).
+
 Idea 1 from `eo-projector.md`: refit v0 on the 2025-26 Elite 64 data with ΔEV and the price-band
 gap, one fit per group (AE64, E64). Code: `src/fplrank/model/eo_flow.py`; rerun with
 `uv run python -m fplrank.model.eo_flow` (needs the cached Core Insights and vaastav files).

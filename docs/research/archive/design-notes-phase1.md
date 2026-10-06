@@ -1,5 +1,7 @@
 # Design notes (Phase 1 brainstorm, 2026-10-05)
 
+> Archived 2026-10-06. Historical record only.
+
 Historical record of the first PM brainstorm. Decisions that stuck are in `solver-design.md` and
 `docs/decisions/`.
 

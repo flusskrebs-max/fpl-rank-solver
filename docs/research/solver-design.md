@@ -2,8 +2,12 @@
 
 Written 2026-10-05 in Cowork after the Phase 1 brainstorm. Nothing here is final; it is the plan we test against.
 
-**v1 route as of 2026-10-06:** S1 (λ knob, built) + S2 (λ from a normal approximation) + B04b (EO
-forecast). [A] simulation, [D] rollout and V are parked. Release order is in `docs/roadmap.md`.
+**Where this stands (2026-10-06).** Built: S1 (the λ knob, `opt/ownership.py`) and S2 (λ from a normal
+approximation of the relative score, `opt/rank_goal.py`), run through Sertalp's solver by `fplrank solve`. Our scope is
+only the EO projection and the λ choice; his solver does the team, projections, the MILP and his simulations. The EO
+used today is last GW's collected EO with chips taken out (fair persistence); the next step is to re-pick each
+manager's XI and captain on next-GW xP (`eo-blend.md`). [A] our own points simulator was built, parked and removed;
+[D] rollout and V are not planned. Release order is in `docs/roadmap.md`. The sections below are the original plan.
 
 ## 1. What already exists (prior art)
 

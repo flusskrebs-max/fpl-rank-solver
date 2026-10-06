@@ -104,3 +104,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
   (no solver, no transfers) beats the per-manager solve: EO error 7.3 / 5.8 vs 7.9 / 6.1 (persistence 11.6 / 8.5); the
   fit puts nearly all weight on it. Critique checks done (fixed player sets, chip split, surges, captains, MIP gaps
   0.2% median, bootstrap). Fixed `cheap_wcshare` LOWO and the hits wording.
+- 2026-10-06, spring clean: fixed three λ-choice bugs (FPL Review position codes gave zero variance; P(target) ignored
+  a non-default `--hit_cost`; a line collected before last GW was compared with this GW's points, now moved on by its
+  pace). Removed EO dynamics v0, the EO flow model, the scenario engine, the dead `--eo-forecast` path and two duplicate
+  scripts. Research docs: `docs/research/README.md` summary, superseded notes in `archive/`, EO patterns note added.
+  Queue pruned to Ship v0.3, CLI 5, EO1b (wire the re-pick into `--eo`), EO1c, RP1.

@@ -38,7 +38,8 @@ def plan_moments(solution: dict, projections: pd.DataFrame, eo, vtable: pd.DataF
     """Mean and variance of a plan's relative score over its horizon."""
     picks = solution["picks"]
     xp = _raw_xp(projections)
-    pos = projections.set_index("ID")["Pos"]
+    # his parser leaves FPL Review's GKP/DEF/MID/FWD as they are until after we read them; v(xP) is keyed G/D/M/F
+    pos = projections.set_index("ID")["Pos"].replace(variance.POS)
     mu = var = 0.0
     weeks = sorted(int(w) for w in picks["week"].unique())
     for w in weeks:

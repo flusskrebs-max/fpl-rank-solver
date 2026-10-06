@@ -1,5 +1,7 @@
 # Ownership dynamics v0 (B04)
 
+> Archived 2026-10-06. B04's v0 model was never wired into `fplrank solve` and is superseded by the re-pick (`../eo-blend.md`: EO error 7.3 / 5.8 against persistence 11.6 / 8.5, where v0 gained about 20%). `model/ownership.py` and the notebook were removed in the spring clean (git history).
+
 How elite effective ownership (EO) moves from one gameweek to the next, and a first forecast of
 next-GW EO with an error bar. Code: `src/fplrank/model/ownership.py`. Analysis:
 `notebooks/b04_ownership_dynamics.py` (needs local data). Data: 2026-27 GW1-5 for the overall top

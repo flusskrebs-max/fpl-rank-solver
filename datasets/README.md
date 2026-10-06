@@ -79,7 +79,7 @@ then per group `<group>_own` (managers owning him; fractional where squads were 
 | `estimated (GW4 WCs mirrored; GW6 WC table partial for D/M)` | after early wildcards whose new squads are only partly known |
 | `anchored (GW32/35 WC squads inferred from EO + later sales)` | wildcard squads inferred from EO and later sales |
 
-How it was rebuilt (Cowork, `scripts/reconstruct_elite_ownership.py`): the GW1 squads plus the
+How it was rebuilt (Cowork, `scripts/elite64/reconstruct_ownership_2025-26.py`): the GW1 squads plus the
 complete transfer lists carry ownership forward exactly between wildcards. GW6 wildcards use the
 wildcard pick table (complete for G/F; D/M lists are top 10, so the shortfall is spread over the
 kept squads). Other wildcard weeks start from "wildcarders mirror the group" and are then corrected
@@ -146,9 +146,8 @@ with its exact value, so the validation tests fail if the data changes or a new 
 - EO graphics start at GW10, so `load_eo` / `eo_panel` cover GW10-38 only; meta and ownership cover
   GW1-38.
 
-Derived tables (weekly summary, transfer flows vs last-GW points, biggest pile-ins) need vaastav's
-points, so they are not committed: `uv run python scripts/elite_flows.py 2025-26` writes them to
-`data/derived/elite64/`.
+Derived tables: `elite64_weekly_summary_2025-26.csv` and `elite64_flows_player_gw_2025-26.csv` (transfer flows vs
+last-GW points), built by Cowork's `scripts/elite64/analyse_2025-26.py` from these files and vaastav's points.
 
 ### Adding a new season or source
 
