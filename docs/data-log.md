@@ -22,6 +22,16 @@ Claude Code (PM + developer) since 2026-10-06; earlier entries were written by t
   vaastav `xP` is FPL's `ep_this`, the same measure, which is why the two correlate so well.
 - Consequence: `ep_next` is fine as S1's offline/test fallback and as a like-for-like xP for past seasons
   (S2b, B04b, banded by quantile), but not as a projection for real decisions. Use Solio for those.
+## 2026-10-06: Top-10k sample collected; EO now from the deadline XI
+
+- First run of the `top10k` set (every 10th of ranks 1-10,000, 1,000 managers, GW1-5): 56 min for all
+  2,022 managers, no failures.
+- Fix: EO used to be built from FPL's picks *after* automatic subs. Rebuilt from the deadline XI,
+  João Pedro GW5 is AE64 6.2% and E64 28.1%, matching the Solio graphic (6% / 28%); top 10k 60%.
+- Our GW5 top-10k EO against LiveFPL's top-10k page (667 players): correlation 0.98, mean absolute
+  gap 6 points over LiveFPL's top 40 (top1000 8, E64 9, AE64 17). LiveFPL runs a few points higher on
+  several players (Calafiori 85 vs 77, Rogers 64 vs 52, Raya 52 vs 42); likely a different population
+  (LiveFPL's top 10k at the GW5 deadline vs ours, today's top 10k) plus ±3 points sampling error.
 
 ## 2026-10-06: Data sources review
 
