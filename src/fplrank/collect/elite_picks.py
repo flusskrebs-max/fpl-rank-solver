@@ -89,6 +89,7 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
         "overall_top": [int(n) for n in cfg.get("overall_top", [])],
         "named_lists": {name: [int(e) for e in ids] for name, ids in cfg.get("named_lists", {}).items()},
         "leagues": {name: int(league) for name, league in cfg.get("leagues", {}).items()},
+        "sampled": {name: {"ranks": int(s["ranks"]), "every": int(s["every"])} for name, s in cfg.get("sampled", {}).items()},
         "threshold_ranks": [int(r) for r in cfg.get("threshold_ranks", [])],
     }
 
@@ -127,6 +128,16 @@ class Collector:
                 if not standings["has_next"]:
                     break
             rows += [{"set": f"top{n}", "entry_id": r["entry"], "rank": r["rank"]} for r in results[:n]]
+        for name, spec in config.get("sampled", {}).items():  # every k-th manager of the overall top N
+            for page in range(1, math.ceil(spec["ranks"] / STANDINGS_PAGE_SIZE) + 1):
+                standings = self.fetch(_standings_endpoint(page), self.max_age)["standings"]
+                rows += [
+                    {"set": name, "entry_id": r["entry"], "rank": r["rank"]}
+                    for r in standings["results"]
+                    if r["rank_sort"] <= spec["ranks"] and (r["rank_sort"] - 1) % spec["every"] == 0
+                ]
+                if not standings["has_next"]:
+                    break
         for name, ids in config["named_lists"].items():
             rows += [{"set": name, "entry_id": e, "rank": None} for e in ids]
         for name, league in config.get("leagues", {}).items():  # every member of a classic league
@@ -443,8 +454,8 @@ def _main(argv=None):
         tables = build(config["season"], threshold_ranks=config["threshold_ranks"])
         print({k: len(v) for k, v in tables.items()})
         return
-    if args.top:
-        config["overall_top"] = [args.top]
+    if args.top:  # quick test: just the top N
+        config["overall_top"], config["sampled"] = [args.top], {}
     start = time.monotonic()
     summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config)
     print(f"Done in {(time.monotonic() - start) / 60:.1f} min: {summary}")

@@ -9,6 +9,11 @@ overall_top = [1000]
 # for rank X are recorded every GW (data/collected/thresholds.parquet).
 threshold_ranks = [100, 1000, 10000, 100000]
 
+# Samples of the overall league: every `every`-th manager of the top `ranks` (by rank_sort, starting at
+# rank 1). The key becomes the set / EO group name. top10k: ~1,000 managers, EO to about ±1.5 points at 50%.
+[sampled]
+top10k = { ranks = 10000, every = 10 }
+
 # Hand-maintained lists of team ids. The key becomes the set / EO group name.
 [named_lists]
 # elite64 = [123456, 234567]
