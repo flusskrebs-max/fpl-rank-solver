@@ -22,6 +22,12 @@ Claude Code (PM + developer) since 2026-10-06; earlier entries were written by t
   vaastav `xP` is FPL's `ep_this`, the same measure, which is why the two correlate so well.
 - Consequence: `ep_next` is fine as S1's offline/test fallback and as a like-for-like xP for past seasons
   (S2b, B04b, banded by quantile), but not as a projection for real decisions. Use Solio for those.
+## 2026-10-06: FPL-Core-Insights 2025-26 loaded (D1)
+
+- `fplrank.data.core_insights.playerstats("2025-26")`: 29,978 rows, GW1-38, 752-841 players a GW.
+- Offset check of `ep_next` against vaastav `xP` (summed per player-GW) on the 11 GWs with both: the
+  gw = N row matches GW N best (r 0.92-0.97, mean absolute gap 0.19-0.45 from GW2 on; gw = N-1 gives
+  0.83-0.95). GW1 is the exception (r 0.40), so treat GW1 as unreliable. `xp_from_ep_next` uses gw = N.
 ## 2026-10-06: Top-10k sample collected; EO now from the deadline XI
 
 - First run of the `top10k` set (every 10th of ranks 1-10,000, 1,000 managers, GW1-5): 56 min for all
@@ -32,13 +38,6 @@ Claude Code (PM + developer) since 2026-10-06; earlier entries were written by t
   gap 6 points over LiveFPL's top 40 (top1000 8, E64 9, AE64 17). LiveFPL runs a few points higher on
   several players (Calafiori 85 vs 77, Rogers 64 vs 52, Raya 52 vs 42); likely a different population
   (LiveFPL's top 10k at the GW5 deadline vs ours, today's top 10k) plus ±3 points sampling error.
-## 2026-10-06: FPL-Core-Insights 2025-26 loaded (D1)
-
-- `fplrank.data.core_insights.playerstats("2025-26")`: 29,978 rows, GW1-38, 752-841 players a GW.
-- Offset check of `ep_next` against vaastav `xP` (summed per player-GW) on the 11 GWs with both: the
-  gw = N row matches GW N best (r 0.92-0.97, mean absolute gap 0.19-0.45 from GW2 on; gw = N-1 gives
-  0.83-0.95). GW1 is the exception (r 0.40), so treat GW1 as unreliable. `xp_from_ep_next` uses gw = N.
-
 ## 2026-10-06: Data sources review
 
 - vaastav has stopped weekly updates; its 2025-26 `xP` is filled only for GWs 1-6, 8, 9, 24, 29 and 38.

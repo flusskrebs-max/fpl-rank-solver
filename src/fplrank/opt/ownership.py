@@ -240,6 +240,10 @@ def _main(argv=None):
     )
     p.add_argument("--horizon", type=int, default=5)
     p.add_argument("--secs", type=int, default=600, help="time limit per solve (upstream default; solves usually finish in seconds)")
+    p.add_argument("--target-rank", type=int, help="S2: also choose λ for finishing at or above this overall rank")
+    p.add_argument("--points", type=int, help="S2: our total points now (default: from the FPL API)")
+    p.add_argument("--drift-group", help="S2: collector group for the line's drift (default: --eo, or top10k for solio)")
+    p.add_argument("--kappa", type=float, default=0.3, help="S2: share of our projected edge over the field taken as real")
     args = p.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")  # player names on the Windows console
 
@@ -270,9 +274,42 @@ def _main(argv=None):
     lams = SWEEP if args.sweep or not args.lam else args.lam
     options = {"horizon": args.horizon, "secs": args.secs}
     with contextlib.redirect_stdout(io.StringIO()):  # upstream prints a lot per solve
-        table, _ = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options)
+        table, solutions = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options)
     with pd.option_context("display.width", 200, "display.max_colwidth", 60):
         print(table.to_string(index=False))
+    if args.target_rank:
+        _rank_goal(args, solutions, projections, eo, next_gw)
+
+
+def _rank_goal(args, solutions, projections, eo, next_gw):
+    """S2c: P(finishing at or above the target line) per λ, and the λ that maximises it."""
+    from fplrank.data.fpl_api import FplApi
+    from fplrank.model import variance
+    from fplrank.opt import rank_goal
+    from fplrank.rank import target
+
+    points = args.points
+    if points is None:
+        points = FplApi().entry_history(args.team)["current"][-1]["total_points"]
+    group = args.drift_group or ("top10k" if args.eo == "solio" else args.eo)
+    line = target.target_line(args.target_rank)
+    drift, _ = target.line_drift(args.target_rank, group)
+    gws_left = 38 - next_gw + 1
+    gap = line.now - points + drift * gws_left
+    vtable = variance.build()
+    plans = {
+        lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=args.kappa), "ev": sol["ev"]}
+        for lam, sol in solutions.items()
+    }
+    table = rank_goal.choose_lambda(gap, gws_left, plans, sd_line=line.sd)
+    print()
+    print(
+        f"Top {args.target_rank:,} line {line.now:.0f} after GW{line.gw}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
+        f" gap to close {gap:.0f} over {gws_left} GWs (κ = {args.kappa:g}, s = 1)"
+    )
+    with pd.option_context("display.width", 200):
+        print(table.round(3).to_string(index=False))
+    print(rank_goal.report(table, args.target_rank, args.kappa))
 
 
 if __name__ == "__main__":

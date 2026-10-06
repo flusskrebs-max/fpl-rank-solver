@@ -41,6 +41,10 @@ uv run python -m fplrank.opt.ownership --team <your team id> --eo AE64 --sweep
 Output: one row per distinct plan, with the λ values that give it, captain, transfers, chip, EV over
 the horizon, EV this GW, EV cost against λ = 0, EO held and exposure (how far the XI is from the field).
 
+To have it choose λ for a rank goal, add `--target-rank 10000` (your points are read from FPL, or
+give `--points`). It prints P(finishing at or above the line) for each λ and the best one. Early in
+the season the differences are small, because one week's plan matters little over 30+ GWs.
+
 ## 4. Read the plan and decide
 
 Start from the λ = 0 row (pure EV). A row with a small EV cost and a big drop in exposure is cheap

@@ -53,8 +53,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   with past lines interpolated from collected managers' overall ranks. GW2-5: top 10k vs AE64 +2.4 a GW, vs E64 +4.1,
   vs top1000 -10.0 (biased: today's top 1000 were selected for scoring well). `target_line(rank)` (report only):
   line now + GWs left x past seasons' pace; after GW5 top 10k 398 now, ~2589 ± 95 at GW38.
-- 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
-- 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
 - 2026-10-06: ADR 0004 (accepted by Alex): keep S1's xP adjustment, equivalent to the community "risk" term `w·EO·xP`
   plus a (1 − λ) rescaling; no vendor changes. New S1d (`--eo solio`) blocked on a Solio export with EO; S1c on hold.
 - 2026-10-06: PRs #15-17 merged (plan v2, C0, S2a).
@@ -69,3 +67,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, collector fix (with C1): FPL's picks endpoint shows the team after automatic subs once a GW is played, so
   EO was post-sub (João Pedro GW5 AE64 0% instead of 6%). `deadline_picks` swaps auto-subs back; EO tables rebuilt.
   LiveFPL `/EO` (all players, top 10k + overall, current GW) is the manual cross-check; no history or per-manager data.
+- 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
+- 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
+- 2026-10-06, S2c: `fplrank.opt.rank_goal` + S1 CLI `--target-rank [--points]`. Live, rank-1 team's squad, top 10k, AE64,
+  GW6, 33 GWs left: P 53% / 36% / 20% with 450 / 398 / 340 points; across λ P moves by at most ~1.3 points (season sd ~72
+  dwarfs a 4-GW plan's effect), matching the review's "a few points, not tens" check. Ties go to λ near 0.
