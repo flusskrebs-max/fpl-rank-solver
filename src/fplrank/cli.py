@@ -140,7 +140,7 @@ def parser() -> argparse.ArgumentParser:
         prog="fplrank solve",
         description="Sertalp's solve.py (all his flags pass through unchanged) plus the EO and λ choice.",
     )
-    p.add_argument("--eo", help="EO group: AE64, E64, top1000, top10k or solio (default AE64 when --target is given)")
+    p.add_argument("--eo", help="EO group: AE64, E64, elite (AE64+E64 average), top1000, top10k or solio (default AE64 with --target)")
     p.add_argument("--target", type=int, help="target overall rank: choose the λ with the best P(finishing at or above it)")
     p.add_argument("--lam", type=float, help="fix λ instead of choosing it (0 = his EV plan)")
     p.add_argument("--points", type=int, help="our total points now, for --target (default: from the FPL API)")

@@ -55,8 +55,9 @@ uv run fplrank solve --team_id <your team id> --eo AE64 --target 10000 --sims 50
 
 Type your real team id in place of `<your team id>` (PowerShell rejects the `<`).
 
-- `--eo` picks whose ownership to weigh against: `AE64`, `E64`, `top1000`, `top10k` (collector, last
-  GW's EO) or `solio` (Solio's forecast).
+- `--eo` picks whose ownership to weigh against: `AE64`, `E64`, `elite` (the average of the two, with the
+  line's drift measured against the same average), `top1000`, `top10k` (collector, last GW's EO with that
+  GW's chips taken out) or `solio` (Solio's forecast).
 - `--target 10000` solves once per λ from −0.3 to 0.3 and picks the λ with the best P(finishing in the
   top 10,000). Your points come from the FPL API, or give `--points`. Use `--lam 0.1` instead to fix λ.
 - `--sims 50` then runs his simulations 50 times at the chosen λ (his noise on the projections) and
