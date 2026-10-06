@@ -46,7 +46,7 @@ rest (team, projections, settings, solve, simulations). The one documented way t
 | CLI 1 | Every solve through his `solve_regular` | (none) | DONE (PR #32) |
 | CLI 2 | `fplrank solve`: his flags plus `--eo`, `--target`, `--lam` | (none) | DONE (PR #33) |
 | CLI 3 | `--sims N`: his simulations and sensitivity summary at the chosen λ | (none) | DONE (PR #35) |
-| CLI 4 | Clean-up: remove our own team loading, projection picking, S1 CLI, weekly harness, toy spike; docs | (none) | IN REVIEW |
+| CLI 4 | Clean-up: remove our own team loading, projection picking, S1 CLI, weekly harness, toy spike; docs | (none) | IN REVIEW (PR #37) |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags | (to write) | TODO |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve` | (none) | TODO |
 
