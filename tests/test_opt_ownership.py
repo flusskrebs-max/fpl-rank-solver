@@ -211,3 +211,50 @@ def test_solio_eo_matches_names_and_varies_by_gw(tmp_path):
     assert adj.loc[0, "6_Pts"] == pytest.approx(6 * (1 + 0.1 * 0.47))
     assert adj.loc[0, "7_Pts"] == pytest.approx(6 * (1 + 0.1 * 0.66))
     assert adj.loc[0, "8_Pts"] == adj.loc[0, "7_Pts"]  # beyond the forecast: last GW reused
+
+
+# --- S1c: λ on the next GW only, and the deadline EO forecast -----------------------------------
+
+
+def test_lam_gw_scales_only_that_gw():
+    proj, eo = _proj(), pd.Series({1: 1.0, 2: 1.6})
+    adj = ow.adjust_projections(proj, eo, 0.2, lam_gw=6)
+    assert list(adj["6_Pts"]) == pytest.approx([6.0, 4.0 * 1.12, 2.0 * 0.8])
+    assert list(adj["7_Pts"]) == list(proj["7_Pts"])
+    pd.testing.assert_frame_equal(ow.adjust_projections(proj, eo, 0.2, lam_gw=None), ow.adjust_projections(proj, eo, 0.2))
+
+
+def test_forecast_eo_returns_eo_mean_by_player(monkeypatch):
+    from fplrank.model import ownership as dyn
+
+    table = pd.DataFrame(
+        {"gw": [5, 5], "fpl_id": [1, 2], "xi": [0.9, 0.1], "bench": 0.0, "cap": [0.5, 0.0], "tc_cap": 0.0, "eo": [1.4, 0.1], "n": 1000}
+    )
+    monkeypatch.setattr(dyn, "projections_for", lambda gw, horizon=1: pd.Series({1: 6.0, 2: 3.0, 3: 2.0}))
+    monkeypatch.setattr(dyn, "points_in", lambda gw: pd.Series({1: 8, 2: 2}))
+    model = dyn.OwnershipModel(tau={"top1000": 1.0})
+    eo = ow.forecast_eo("top1000", 6, model=model, table=table)
+    assert set(eo.index) == {1, 2, 3}
+    assert eo.sum() == pytest.approx(12.0)  # 11 starters plus one captain, no chips
+    assert eo[1] > eo[2] > 0
+
+
+@pytest.mark.slow
+def test_lam_on_first_gw_leaves_later_gws_alone():
+    """λ only on GW6: when the GW6 plan is unchanged, the later GWs' picks match the λ = 0 plan's."""
+    from fplrank.data.projections import from_ep_next
+
+    my_data, bootstrap, fixtures = _gw6()
+    proj = from_ep_next(bootstrap, fixtures, horizon=3)
+    opts = {"horizon": 3, "secs": 120, "gap": 0}
+    eo = pd.Series({e["id"]: 1.5 for e in bootstrap["elements"][:40]})
+    base = ow.solve_with_ownership(my_data, proj, eo, 0.0, bootstrap, fixtures, opts)
+
+    def later(sol):
+        p = sol["picks"]
+        p = p[p["week"] > 6]
+        return sorted(zip(p["week"], p["id"], p["multiplier"], strict=True))
+
+    first_only = ow.solve_with_ownership(my_data, proj, eo, 0.02, bootstrap, fixtures, opts, lam_gw=6)
+    assert ow.plan_key(first_only) == ow.plan_key(base)
+    assert later(first_only) == later(base)
