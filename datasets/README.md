@@ -160,3 +160,8 @@ points, so they are not committed: `uv run python scripts/elite_flows.py 2025-26
 4. Run `uv run pytest tests/test_elite_data.py`. The validation tests run automatically for every
    file pair found (`fplrank.data.elite.available()`).
 5. To extend a season with more GWs, append rows to the existing files. Keep the season/gw columns.
+
+## External sources not committed
+
+- FPL-Core-Insights by olbauday (https://github.com/olbauday/FPL-Core-Insights): per-GW player
+  snapshots, downloaded on demand by `fplrank.data.core_insights` into `data/raw/core_insights/`.

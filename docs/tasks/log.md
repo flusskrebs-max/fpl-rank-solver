@@ -67,3 +67,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, collector fix (with C1): FPL's picks endpoint shows the team after automatic subs once a GW is played, so
   EO was post-sub (João Pedro GW5 AE64 0% instead of 6%). `deadline_picks` swaps auto-subs back; EO tables rebuilt.
   LiveFPL `/EO` (all players, top 10k + overall, current GW) is the manual cross-check; no history or per-manager data.
+- 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
+- 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
