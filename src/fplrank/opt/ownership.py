@@ -16,7 +16,6 @@ decided now, and EO further out is much less certain. Later GWs use raw xP. Each
 the raw projections (`score_plan`) and the λ chosen by P(reaching the target line) (`rank_goal_table`).
 """
 
-import math
 import re
 
 import pandas as pd
@@ -262,23 +261,26 @@ def current_standing(team_id: int) -> tuple[int, int | None]:
     return last["total_points"], last.get("overall_rank")
 
 
-def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=0.3, hit_cost=4) -> tuple[pd.DataFrame, str]:
+def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, group, kappa=None, hit_cost=4) -> tuple[pd.DataFrame, str]:
     """S2c: P(finishing at or above the top-`target_rank` line) per λ, best first, and a line describing the gap.
 
     `points` are ours after GW next_gw - 1. If the collected line is older than that, it is moved on by its
-    pace for the missing GWs, so both sides of the gap are after the same GW.
+    pace for the missing GWs, so both sides of the gap are after the same GW. The drift and the line's spread
+    are against `group` over full past seasons (`rank.target.season_drift`, docs/research/rank-goal-inputs.md).
+    κ defaults to `rank_goal.KAPPA`.
     """
     from fplrank.model import variance
     from fplrank.opt import rank_goal
     from fplrank.rank import target
 
+    kappa = rank_goal.KAPPA if kappa is None else kappa
     line = target.target_line(target_rank)
-    drift, _ = target.line_drift(target_rank, group)
+    drift = target.season_drift(target_rank, group)
     gws_left = 38 - next_gw + 1
     stale = max(next_gw - 1 - line.gw, 0)
     now = line.now + stale * line.pace
-    gap = now - points + drift * gws_left
-    sd_line = 0.0 if math.isnan(line.sd) else line.sd  # one season of cut-offs: no spread to add
+    gap = now - points + drift.drift * gws_left
+    sd_line = drift.sd * gws_left  # the gap's spread, not the absolute line's (that counts the group's swings twice)
     vtable = variance.build()
     plans = {
         lam: {"moments": rank_goal.plan_moments(sol, projections, eo, vtable, kappa=kappa, hit_cost=hit_cost), "ev": sol["ev"]}
@@ -287,7 +289,7 @@ def rank_goal_table(solutions, projections, eo, next_gw, target_rank, points, gr
     table = rank_goal.choose_lambda(gap, gws_left, plans, sd_line=sd_line)
     moved = f" (GW{line.gw} line moved on {stale} GW at {line.pace:.0f} a GW)" if stale else ""
     text = (
-        f"Top {target_rank:,} line {now:.0f} after GW{line.gw + stale}{moved}; we have {points}; drift vs {group} {drift:+.1f} a GW;"
-        f" gap to close {gap:.0f} over {gws_left} GWs (κ = {kappa:g}, s = 1)"
+        f"Top {target_rank:,} line {now:.0f} after GW{line.gw + stale}{moved}; we have {points}; {drift}, a lower bound;"
+        f" gap to close {gap:.0f} ± {sd_line:.0f} over {gws_left} GWs (κ = {kappa:g}, s = 1)"
     )
     return table, text

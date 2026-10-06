@@ -19,6 +19,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 | # | Task | Brief | Status |
 |---|---|---|---|
 | CLEAN | Bug check and spring clean: dead code out, docs consolidated | (none) | DONE (PR #41) |
+| RG1 | P(target) inputs from the data: line spread and drift against the group over full seasons, κ 0.75 (`--kappa`) | (none; `docs/research/rank-goal-inputs.md`) | IN REVIEW |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags | (to write) | TODO |
 
@@ -26,7 +27,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 
 | # | Task | Brief | Status |
 |---|---|---|---|
-| EO1b | `--eo` uses fair persistence re-picked on next-GW xP (XI and captain per manager, `model/eo_blend.py`) instead of last GW's EO, armband herded for AE64/E64 | [EO1b](../briefs/EO1b-repick-eo.md) | IN REVIEW (PR #42) |
+| EO1b | `--eo` uses fair persistence re-picked on next-GW xP (XI and captain per manager, `model/eo_blend.py`) instead of last GW's EO, armband herded for AE64/E64 | [EO1b](../briefs/EO1b-repick-eo.md) | DONE (PR #42) |
 | EO1c | Recheck the herded re-pick against plain re-pick and persistence on GW6 (fresh file) and at ~GW10 | (none) | TODO |
 | RP1 | 2025-26 replay: run `fplrank solve` week by week on last season and record when λ changes the decision (moves, captain) vs the EV plan | (to write) | TODO |
 | Ship v0.4 | Logged real-deadline run with the re-picked EO | (none) | TODO |

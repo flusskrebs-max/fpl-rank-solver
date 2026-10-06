@@ -45,7 +45,7 @@ def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys, monkeypat
 
     # the line comes from collected data on Alex's PC; CI has none
     monkeypatch.setattr(target, "target_line", lambda rank: target.TargetLine(rank, 5, 398, 55, 398 + 33 * 55, 40, ("test",)))
-    monkeypatch.setattr(target, "line_drift", lambda rank, group: (2.5, None))
+    monkeypatch.setattr(target, "season_drift", lambda rank, group: target.SeasonDrift(rank, group, 2.5, 0.5, ("a", "b")))
     ids = [e["id"] for e in request_fn(cli.BOOTSTRAP)["elements"]]
     eo = pd.Series(1.5, index=ids[:40])
     load_eo = lambda group, bootstrap, gw, projections: (eo, f"{group} test")  # noqa: E731

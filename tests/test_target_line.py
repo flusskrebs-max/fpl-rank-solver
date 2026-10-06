@@ -67,3 +67,20 @@ def test_line_drift_against_elite_mix():
     ranks, members = _ranks(), pd.DataFrame({"set": ["AE64", "E64"], "entry_id": [1, 2]})
     _, table = tg.line_drift(10_000, "elite", ranks, members)
     assert list(table["group_points"]) == pytest.approx([(60 + 66) / 2, (70 + 50) / 2, (50 + 60) / 2])
+
+
+def test_season_drift_is_measured_against_the_group():
+    # two managers per season: rank 1,000 and 100,000; the top-10k line sits halfway between them (log rank)
+    rows = []
+    for season, (a, b) in {"2017-18": (3000, 1000), "2018-19": (2600, 2200), "2019-20": (2700, 2300), "2020-21": (2500, 2180)}.items():
+        rows += [(season, 1, a, 1_000), (season, 2, b, 100_000)]
+    past = pd.DataFrame(rows, columns=["season", "entry_id", "total_points", "rank"])
+    members = pd.DataFrame({"set": ["AE64", "E64"], "entry_id": [1, 2]})
+    per_gw = pd.Series([(2400 - 2600) / 38, (2500 - 2700) / 38, (2340 - 2500) / 38])  # line - AE64's mean
+    d = tg.season_drift(10_000, "AE64", past, members)
+    assert d.seasons == ("2018-19", "2019-20", "2020-21")  # 2017-18 is before `since`
+    assert d.drift == pytest.approx(per_gw.mean()) and d.sd == pytest.approx(per_gw.std())
+    elite = tg.season_drift(10_000, "elite", past, members)  # the mix: line minus the AE64/E64 average
+    assert elite.drift == pytest.approx(((2400 - 2400) + (2500 - 2500) + (2340 - 2340)) / 3 / 38)
+    with pytest.raises(ValueError):
+        tg.season_drift(10_000, "AE64", past, members, since="2020-21")  # one season: no spread
