@@ -130,3 +130,7 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, CLI 5: `uv run fplrank page` opens a local Streamlit page (`src/fplrank/ui/`) that fills in the
   `fplrank solve` flags, runs it in its own process and shows the output, with P by λ as a bar chart when there is a
   target. No modelling; last choices kept in `data/ui_settings.json`. Streamlit added as a dependency.
+- 2026-10-06, CLI 5b: `--eo` takes a custom mix of collector groups (`AE64:0.4+E64:0.4+top10k:0.2`, scaled to 1;
+  `ownership.group_weights`), its line drift measured against the AE64/E64 part (top1000/top10k drift is biased low).
+  The page gets a custom-mix option, his usual settings (time limit, horizon, chips, banned/locked, hits, pool) filled
+  in from his settings files with only changes passed on, and a warning when team.json is ticked but missing.

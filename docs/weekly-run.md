@@ -57,7 +57,8 @@ Type your real team id in place of `<your team id>` (PowerShell rejects the `<`)
 
 - `--eo` picks whose ownership to weigh against: `AE64`, `E64`, `elite` (the average of the two, with the
   line's drift measured against the same average), `top1000`, `top10k` (collector, last GW's EO with that
-  GW's chips taken out) or `solio` (Solio's forecast).
+  GW's chips taken out) or `solio` (Solio's forecast). Or your own mix of the collector groups, such as
+  `--eo AE64:0.4+E64:0.4+top10k:0.2` (weights scaled to add up to 1; the line's drift uses the AE64/E64 part).
 - `--target 10000` solves once per λ from −0.3 to 0.3 and picks the λ with the best P(finishing in the
   top 10,000). Your points come from the FPL API, or give `--points`. Use `--lam 0.1` instead to fix λ.
   `--kappa 0.5` changes how much of your projected edge over the field counts (default 0.75;
@@ -80,8 +81,9 @@ uv run fplrank page
 ```
 
 This opens a page in your browser (http://localhost:8501) with the same options as boxes and a Solve button. It
-shows the command it runs, the output as it comes, and P by λ as a chart. It remembers your team id. Steps 1 to 3
-still apply. Close the PowerShell window (or press Ctrl+C in it) to stop the page.
+shows the command it runs, the output as it comes, and P by λ as a chart. Under "Sertalp's settings" are his usual
+settings (time limit, horizon, chips, banned/locked players, hits and so on), filled in from his settings files;
+only the ones you change are passed on. It remembers your choices. Steps 1 to 3 still apply. Close the PowerShell window (or press Ctrl+C in it) to stop the page.
 
 ## 5. Read the plan and decide
 

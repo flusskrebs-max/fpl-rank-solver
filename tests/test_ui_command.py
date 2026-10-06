@@ -4,7 +4,7 @@ import pytest
 
 from fplrank import cli
 from fplrank.opt import ownership
-from fplrank.ui.command import Choices, chosen_lam, command_line, p_by_lam, solve_args
+from fplrank.ui.command import HIS_SETTINGS, Choices, chosen_lam, command_line, his_defaults, p_by_lam, parse_ids, solve_args
 
 
 def test_target_run():
@@ -13,10 +13,11 @@ def test_target_run():
 
 
 def test_fixed_lam_and_his_flags():
-    c = Choices(team_id="1", team_json=True, mode="lam", lam=0.1, eo="solio", eo_drift=False, horizon=5, extra='--banned "[12, 34]"')
+    his = {"horizon": 5, "secs": 120, "use_wc": [8], "decay_base": 0.85, "preseason": True, "hit_limit": None}
+    c = Choices(team_id="1", team_json=True, mode="lam", lam=0.1, eo="solio", eo_drift=False, his=his, extra='--banned "[12, 34]"')
     assert solve_args(c) == [
-        "--team_id", "1", "--team_data", "json", "--horizon", "5", "--eo", "solio", "--lam", "0.1",
-        "--eo_decay", "0.7", "--eo_drift", "false", "--banned", "[12, 34]",
+        "--team_id", "1", "--team_data", "json", "--horizon", "5", "--secs", "120", "--use_wc", "[8]", "--decay_base", "0.85",
+        "--preseason", "true", "--eo", "solio", "--lam", "0.1", "--eo_decay", "0.7", "--eo_drift", "false", "--banned", "[12, 34]",
     ]  # fmt: skip
 
 
@@ -46,3 +47,20 @@ def test_output_lines():
     assert p_by_lam(out) == {-0.1: 0.12, 0.0: 0.14, 0.1: 0.21}
     assert chosen_lam(out) == 0.1
     assert p_by_lam("no target") == {} and chosen_lam("") is None
+
+
+def test_custom_mix():
+    c = Choices(eo="mix", mix={"AE64": 0.4, "E64": 0.4, "top1000": 0.0, "top10k": 0.2})
+    args = solve_args(c)
+    assert args[args.index("--eo") + 1] == "AE64:0.4+E64:0.4+top10k:0.2"
+    assert ownership.group_weights(args[args.index("--eo") + 1]) == pytest.approx({"AE64": 0.4, "E64": 0.4, "top10k": 0.2})
+    with pytest.raises(ValueError):
+        solve_args(Choices(eo="mix", mix={"AE64": 0.0}))
+
+
+def test_his_settings_exist_in_his_files():
+    defaults = his_defaults()
+    assert all(key in defaults for settings in HIS_SETTINGS.values() for key, _, _ in settings)
+    assert parse_ids("8, 10 12") == [8, 10, 12] and parse_ids(" ") == []
+    with pytest.raises(ValueError):
+        parse_ids("8, Salah")

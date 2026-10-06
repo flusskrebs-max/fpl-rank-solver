@@ -1,10 +1,14 @@
 """The page's form as `fplrank solve` flags, and the two lines of its output the page draws (no modelling here)."""
 
+import json
 import re
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-EO_GROUPS = ("AE64", "E64", "elite", "top1000", "top10k", "solio")
+from fplrank.paths import UPSTREAM_DIR
+
+EO_GROUPS = ("AE64", "E64", "elite", "top1000", "top10k", "solio", "mix")
+MIX_GROUPS = ("AE64", "E64", "top1000", "top10k")  # what a custom EO mix can weigh (opt.ownership.COLLECTOR_GROUPS)
 MODES = {
     "target": "Choose λ for a target rank",
     "lam": "Fix λ",
@@ -18,15 +22,93 @@ class Choices:
     team_json: bool = False  # his --team_data json (team.json from his bookmarklet)
     mode: str = "target"
     eo: str = "AE64"
+    mix: dict[str, float] = field(default_factory=lambda: {"AE64": 0.5, "E64": 0.5})  # weights when eo is "mix"
     target: int = 10000
     lam: float = 0.0
     points: int | None = None  # None: from the FPL API
     kappa: float | None = None  # None: cli default
     eo_decay: float = 0.7
     eo_drift: bool = True
-    horizon: int | None = None  # None: his settings file
     sims: int = 0
+    his: dict = field(default_factory=dict)  # his settings that differ from his settings files (HIS_SETTINGS)
     extra: str = ""  # any of his flags, as typed on the command line
+
+
+# His usual settings on the page, by section: (key, label, kind). Kinds: int, float, bool, text, gws (a list of
+# GWs or player ids), "int?" (blank = his null). Everything else goes in the extra flags box.
+HIS_SETTINGS = {
+    "Solve": [
+        ("secs", "Time limit per solve (s)", "int"),
+        ("gap", "MIP gap (0 = solve to optimal)", "float"),
+        ("horizon", "Weeks to plan", "int"),
+        ("datasource", "Projections source", "text"),
+        ("override_next_gw", "Plan from GW (blank = next GW)", "int?"),
+        ("preseason", "Preseason (empty squad)", "bool"),
+    ],
+    "Transfers": [
+        ("decay_base", "Decay base", "float"),
+        ("ft_value", "Free transfer value", "float"),
+        ("hit_cost", "Hit cost", "int"),
+        ("weekly_hit_limit", "Hits allowed a GW", "int"),
+        ("hit_limit", "Hits allowed in total (blank = no limit)", "int?"),
+        ("itb_value", "Value of £0.1m in the bank", "float"),
+        ("no_transfer_last_gws", "No transfers in the last N GWs", "int"),
+        ("no_future_transfer", "No transfers after this GW", "bool"),
+    ],
+    "Chips": [
+        ("use_wc", "Wildcard in GW", "gws"),
+        ("use_fh", "Free hit in GW", "gws"),
+        ("use_bb", "Bench boost in GW", "gws"),
+        ("use_tc", "Triple captain in GW", "gws"),
+    ],
+    "Players (FPL ids)": [
+        ("banned", "Banned", "gws"),
+        ("locked", "Locked", "gws"),
+        ("banned_next_gw", "Banned next GW", "gws"),
+        ("locked_next_gw", "Locked next GW", "gws"),
+    ],
+    "Player pool and output": [
+        ("xmin_lb", "Min expected minutes over the horizon", "int"),
+        ("ev_per_price_cutoff", "Keep top % by EV per price", "int"),
+        ("keep_top_ev_percent", "Keep top % by EV", "int"),
+        ("vcap_weight", "Vice-captain weight", "float"),
+        ("num_iterations", "Plans to show (iterations)", "int"),
+        ("iteration_criteria", "Iteration criteria", "text"),
+    ],
+}
+
+
+def his_defaults(data_dir=UPSTREAM_DIR / "data") -> dict:
+    """His settings as his solver reads them: comprehensive_settings.json, then user_settings.json on top."""
+    with open(data_dir / "comprehensive_settings.json", encoding="utf-8") as f:
+        options = json.load(f)
+    with open(data_dir / "user_settings.json", encoding="utf-8") as f:
+        return {**options, **json.load(f)}
+
+
+def parse_ids(text: str) -> list[int]:
+    """'8, 10' -> [8, 10]."""
+    try:
+        return [int(x) for x in re.split(r"[,\s]+", text.strip()) if x]
+    except ValueError:
+        raise ValueError(f"expected numbers separated by commas, got {text!r}") from None
+
+
+def his_flag(value) -> str:
+    """One of his settings as he parses it on the command line."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list | dict):
+        return json.dumps(value)
+    return f"{value:g}" if isinstance(value, float) else str(value)
+
+
+def mix_spec(weights: dict[str, float]) -> str:
+    """{AE64: 0.4, top10k: 0.2} -> 'AE64:0.4+top10k:0.2' (`--eo`; zero weights left out)."""
+    spec = "+".join(f"{g}:{w:g}" for g, w in weights.items() if w > 0)
+    if not spec:
+        raise ValueError("the EO mix needs at least one weight above 0")
+    return spec
 
 
 def solve_args(c: Choices) -> list[str]:
@@ -38,12 +120,13 @@ def solve_args(c: Choices) -> list[str]:
         args += ["--team_id", c.team_id.strip()]
     if c.team_json:
         args += ["--team_data", "json"]
-    if c.horizon:
-        args += ["--horizon", str(c.horizon)]
+    for key, value in c.his.items():
+        if value is not None:
+            args += [f"--{key}", his_flag(value)]
     if c.mode != "plain":
         if c.eo not in EO_GROUPS:
             raise ValueError(f"unknown EO group {c.eo}")
-        args += ["--eo", c.eo]
+        args += ["--eo", mix_spec(c.mix) if c.eo == "mix" else c.eo]
         if c.mode == "target":
             args += ["--target", str(c.target)]
             if c.points is not None:

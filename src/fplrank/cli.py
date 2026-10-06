@@ -164,7 +164,11 @@ def parser() -> argparse.ArgumentParser:
         prog="fplrank solve",
         description="Sertalp's solve.py (all his flags pass through unchanged) plus the EO and λ choice.",
     )
-    p.add_argument("--eo", help="EO group: AE64, E64, elite (AE64+E64 average), top1000, top10k or solio (default AE64 with --target)")
+    p.add_argument(
+        "--eo",
+        help="EO group: AE64, E64, elite (AE64+E64 average), top1000, top10k, solio, or a mix such as AE64:0.4+E64:0.4+top10k:0.2 "
+        "(default AE64 with --target)",
+    )
     p.add_argument("--target", type=int, help="target overall rank: choose the λ with the best P(finishing at or above it)")
     p.add_argument("--lam", type=float, help="fix λ instead of choosing it (0 = his EV plan)")
     p.add_argument("--points", type=int, help="our total points now, for --target (default: from the FPL API)")
@@ -197,6 +201,11 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     if ours.target is None and ours.lam is None:
         p.error("--eo needs --target (to choose λ) or --lam (to fix it)")
     group = ours.eo or "AE64"
+    if group != "solio":
+        try:
+            ownership.group_weights(group)
+        except ValueError as e:
+            p.error(str(e))
     lams = sorted({0.0} | ({ours.lam} if ours.lam is not None else set(ownership.SWEEP)), key=abs)
 
     runs, eo, gw, eo_text = {}, None, None, ""
