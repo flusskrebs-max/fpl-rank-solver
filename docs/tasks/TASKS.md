@@ -72,5 +72,6 @@ B01, B01b, B02, B03 (PRs #1-4); B03b, B04, B05, B06, B07 (PRs #5-9); B05 follow-
   checks with real solves on 2025-26 data. Live check on the rank-1 team, GW6, horizon 4, top1000 GW5 EO:
   λ −0.3..−0.2 sells Haaland (EV cost 6.7), λ −0.1..0.05 is the EV plan, λ 0.1 captains Haaland (cost 0.8),
   λ 0.2..0.3 sells Szoboszlai for Groß (cost 3.4); exposure falls from 89 to 67 across the range.
-  Caveat: with a 60 s limit per solve, EV figures can be off by ~1-2 points (a λ ≠ 0 plan once scored
-  above λ = 0 over the horizon), so small EV costs are noise.
+  Solves finish in ~2 s each (12 s for four, API included), so the time limit (now upstream's 600 s by
+  default) is not binding. A λ ≠ 0 plan can show a slightly negative EV cost because upstream maximises a
+  discounted objective (decay 0.9, FT and bank values), not the raw horizon EV we report.
