@@ -13,10 +13,11 @@ import sys
 import pandas as pd
 import streamlit as st
 
-from fplrank.paths import DATA_DIR, PROJECT_ROOT
+from fplrank.paths import DATA_DIR, PROJECT_ROOT, UPSTREAM_DIR
 from fplrank.ui.command import EO_GROUPS, MODES, Choices, chosen_lam, command_line, p_by_lam, solve_args
 
 SETTINGS = DATA_DIR / "ui_settings.json"
+TEAM_JSON = UPSTREAM_DIR / "data" / "team.json"  # where his bookmarklet's team goes (docs/weekly-run.md)
 
 
 def load_choices() -> Choices:
@@ -39,6 +40,8 @@ def form(saved: Choices) -> Choices:
     team_json = st.sidebar.checkbox(
         "Use team.json from the bookmarklet", saved.team_json, help="His --team_data json: for after transfers or price changes"
     )
+    if team_json and not TEAM_JSON.exists():
+        st.sidebar.warning("No team.json yet: save it from the bookmarklet (docs/weekly-run.md, step 3) or untick this box.")
     horizon = st.sidebar.number_input("Weeks to plan (0 = his settings file)", 0, 15, saved.horizon or 0)
 
     st.sidebar.header("Rank goal")
