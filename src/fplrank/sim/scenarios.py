@@ -1,62 +1,112 @@
-"""Scenario engine v0 ([A] in docs/research/solver-design.md, brief B07).
+"""Scenario engine ([A] in docs/research/solver-design.md; briefs B07, B07b).
 
-`simulate(projections, fixtures, S, H, seed)` returns integer FPL points, `array[S, H, players]`, for
-the first H GWs of `projections`, correlated within teams and fixtures and matching each player's
-projected mean.
+`simulate(projections, fixtures, S, H, seed, rules=...)` returns integer FPL points, `array[S, H, players]`,
+for the first H GWs of `projections`, correlated within teams and fixtures, with each player's mean
+matched to his projection where possible.
 
 Per player and fixture (a double GW is two fixtures, a blank none):
 
-- **Minutes**: 0 / 1-59 / 60+ from projected xMins (`minutes_states`).
+- **Minutes**: 0 / 1-59 / 60+ with probabilities read from an empirical table by projected xMins
+  (`Params.minutes_table`). Minutes come only from xMins; mean matching never changes them.
 - **Team goals**: one Poisson draw per team per fixture. A team's goals for are its opponent's goals
-  against, so attackers rise together and defenders share clean sheets and goals conceded. Expected
-  goals come from the projections themselves: each team's attack index is the projected points of
-  its midfielders and forwards in that fixture, relative to the average.
+  against, so attackers rise together and defenders share clean sheets and goals conceded exactly.
+  Expected goals: the season's goals per team per match (`Rules.team_goals`, taken from the
+  previous season) times each team's attack index, the projected points of its midfielders and
+  forwards in that fixture relative to the average.
 - **Events**: each team goal is the player's (or his assist) with probability rate x minutes share /
-  expected team goals, so nobody outscores his team;
-  clean sheet (60+ and nothing conceded); goals conceded (-1 per 2, GK/DEF on 60+); saves (GK);
-  defensive contributions, yellow and red cards (2025-26 rates per position); bonus 3/2/1 to the
-  top three of a BPS-like score per fixture. Scored with the 2025-26 rules.
-- **Matching means**: each player-fixture's attacking rate is tuned (a few short simulations) so the
-  simulated mean equals the projected points. Where a player's non-attacking points alone already
-  exceed the projection (rate 0), the mean stays above it; `match_report` says how often.
+  expected team goals; with probability `shared_weight` the draw uses his team's actual goals,
+  otherwise an independent draw of the same size. Clean sheet (60+ and nothing conceded), goals
+  conceded (-1 per 2, GK/DEF on 60+), saves (GK, more against stronger attacks), defensive
+  contributions (when the season's rules have them; likelier the more the opponent scores), cards,
+  and bonus 3/2/1 to the top three of a BPS-like score per fixture.
+- **Matching means**: each player-fixture's attacking rate is fitted so the simulated mean equals the
+  projection, capped by the share of his team's goals and assists he can take
+  (`max_goal_share`, `max_assist_share`). Where the cap binds the mean stays below the projection;
+  where non-attacking points alone exceed it the mean stays above. `match_report` reports both.
 
-Base rates come from 2025-26 actuals (vaastav merged_gw, 60+ minute appearances).
+Every tunable constant is in `Params`, with where it was fitted.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
 POSITIONS = ["G", "D", "M", "F"]
-GOAL_PTS = np.array([10, 6, 5, 4])  # by position index (2025-26 rules)
+GOAL_PTS = np.array([10, 6, 5, 4])  # by position index (keepers never score in the engine)
 CS_PTS = np.array([4, 4, 1, 0])
 GC_APPLIES = np.array([True, True, False, False])
-ASSIST_PER_GOAL = np.array([0.0, 1.7, 1.06, 0.33])  # assists per goal, 2025-26
 ATTACK_GOAL_SHARE = np.array([0.0, 1.0, 1.0, 1.0])  # keepers: assists only
-DC_PROB = np.array([0.0, 0.27, 0.179, 0.012])  # defensive contribution (2 pts), per 60+ appearance
-YELLOW_PROB = np.array([0.073, 0.163, 0.159, 0.111])
-RED_PROB = 0.003
-SAVES_PER_GAME = 2.78
 BPS_GOAL = np.array([12, 12, 18, 24])
-BASE_TEAM_GOALS = 1.375
-MINS_SUB, MINS_FULL = 22, 85  # average minutes in the 1-59 and 60+ states
-LAMBDA_RANGE = (0.6, 3.0)  # expected team goals per match
-MAX_GOAL_SHARE, MAX_ASSIST_SHARE = 0.5, 0.4  # of his team's goals (Haaland-level is ~0.4)
-SHARED_WEIGHT = 0.7  # chance a player's goal/assist draw uses his team's goals rather than an independent draw (fitted to 2025-26)
 
 
-def minutes_states(xmins) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """P(0), P(1-59), P(60+) from projected minutes for one fixture.
+@dataclass(frozen=True)
+class Rules:
+    """Scoring rules and scoring environment of a season."""
 
-    P(plays) = min(1, xMins / 70); given that he plays, P(60+) rises linearly from 0 at 22 average
-    minutes to 1 at 85. The expected minutes then roughly equal xMins.
-    """
+    defensive_contributions: bool
+    team_goals: float  # goals per team per match: the PREVIOUS season's actual, so tests stay out of sample
+
+
+RULES = {
+    "2023-24": Rules(defensive_contributions=False, team_goals=1.639),  # training season: its own value
+    "2024-25": Rules(defensive_contributions=False, team_goals=1.639),  # from 2023-24
+    "2025-26": Rules(defensive_contributions=True, team_goals=1.467),  # from 2024-25
+    "2026-27": Rules(defensive_contributions=True, team_goals=1.375),  # from 2025-26
+}
+
+
+@dataclass(frozen=True)
+class Params:
+    """Every tunable constant, with where it was fitted (vaastav merged_gw unless said otherwise)."""
+
+    # Minutes: P(0) and P(1-59) by xMins per fixture, from xMins = average minutes per fixture over the
+    # previous 4 GWs vs minutes played (2023-24, GW5+, single fixtures). xMins 0 means "out": P(0) = 1.
+    minutes_table: tuple = (  # outfield players
+        (5, 20, 40, 60, 75, 82.5, 86.5, 89.5),  # xMins (band midpoints)
+        (0.571, 0.427, 0.327, 0.203, 0.137, 0.121, 0.078, 0.054),  # P(0)
+        (0.331, 0.310, 0.282, 0.188, 0.148, 0.105, 0.093, 0.057),  # P(1-59)
+    )
+    keeper_minutes_table: tuple = (  # keepers: almost never part of a game; backups rarely play at all
+        (5, 20, 40, 60, 75, 89.5),
+        (0.556, 0.636, 0.506, 0.357, 0.360, 0.054),
+        (0.111, 0.028, 0.023, 0.020, 0.000, 0.015),
+    )
+    mins_sub: float = 21.9  # average minutes in 1-59 appearances (2023-24)
+    mins_full: float = 85.5  # average minutes in 60+ appearances (2023-24)
+    assist_per_goal: tuple = (0.0, 1.49, 0.968, 0.447)  # by position, 60+ appearances (2023-24)
+    yellow_prob: tuple = (0.077, 0.175, 0.184, 0.120)  # per 60+ appearance (2023-24)
+    red_prob: float = 0.004  # (2023-24)
+    saves_per_game: float = 3.28  # keepers, 60+ (2023-24)
+    dc_prob: tuple = (0.0, 0.27, 0.179, 0.012)  # defensive contribution per 60+ appearance (2025-26, the only season with them)
+    # Relative change in DC chance per goal conceded. Fitted on the 2025-26 GWs without xP (so outside the
+    # final check): D -0.02, M -0.04 per goal, i.e. no relationship, so 0 ("busy defenders" not supported)
+    dc_per_goal_against: float = 0.0
+    lambda_range: tuple = (0.6, 3.0)  # expected team goals per match (judgement)
+    max_goal_share: float = 0.6  # of his team's goals (brief: top players take 50-60% of involvements)
+    max_assist_share: float = 0.5
+    shared_weight: float = 0.7  # tuned on 2023-24
+    bps_noise: float = 6.0  # sd of the BPS-like score's noise; tuned on 2023-24
+    fitted: dict = field(default_factory=dict, compare=False)  # notes from the latest tuning run
+
+
+DEFAULT_PARAMS = Params()
+
+
+def minutes_states(xmins, params: Params = DEFAULT_PARAMS, keeper=False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """P(0), P(1-59), P(60+) for one fixture, interpolated from the outfield or keeper minutes table."""
     x = np.clip(np.asarray(xmins, float), 0, 90)
-    p_play = np.minimum(1.0, x / 70)
-    cond = np.divide(x, p_play, out=np.zeros_like(x), where=p_play > 0)
-    p_full = p_play * np.clip((cond - MINS_SUB) / (MINS_FULL - MINS_SUB), 0, 1)
-    return 1 - p_play, p_play - p_full, p_full
+    keeper = np.broadcast_to(np.asarray(keeper, bool), x.shape)
+
+    def read(table):
+        grid, t0, t1 = (np.array(v, float) for v in table)
+        return np.interp(x, grid, t0), np.interp(x, grid, t1)
+
+    (o0, o1), (k0, k1) = read(params.minutes_table), read(params.keeper_minutes_table)
+    p0, p1 = np.where(keeper, k0, o0), np.where(keeper, k1, o1)
+    out = x <= 0
+    p0, p1 = np.where(out, 1.0, p0), np.where(out, 0.0, p1)
+    return p0, p1, 1 - p0 - p1
 
 
 @dataclass
@@ -74,18 +124,15 @@ class Slots:
     lam: np.ndarray  # expected team goals per side (length 2 * fixtures)
 
 
-def _gw_slots(proj_gw: pd.DataFrame, fix_gw: pd.DataFrame, players: pd.Index) -> Slots | None:
+def _gw_slots(proj_gw: pd.DataFrame, fix_gw: pd.DataFrame, players: pd.Index, rules: Rules, params: Params) -> Slots | None:
     if fix_gw.empty:
         return None
     fix_gw = fix_gw.reset_index(drop=True)
+    idx = fix_gw.index
     sides = pd.concat(
         [
-            pd.DataFrame(
-                {"team_id": fix_gw["team_h"], "fixture": fix_gw.index, "side": 2 * fix_gw.index, "opp_side": 2 * fix_gw.index + 1}
-            ),
-            pd.DataFrame(
-                {"team_id": fix_gw["team_a"], "fixture": fix_gw.index, "side": 2 * fix_gw.index + 1, "opp_side": 2 * fix_gw.index}
-            ),
+            pd.DataFrame({"team_id": fix_gw["team_h"], "fixture": idx, "side": 2 * idx, "opp_side": 2 * idx + 1}),
+            pd.DataFrame({"team_id": fix_gw["team_a"], "fixture": idx, "side": 2 * idx + 1, "opp_side": 2 * idx}),
         ]
     )
     rows = proj_gw.merge(sides, on="team_id")
@@ -95,10 +142,9 @@ def _gw_slots(proj_gw: pd.DataFrame, fix_gw: pd.DataFrame, players: pd.Index) ->
     rows["xpts_f"] = rows["xpts"] / n_fix
     rows["xmins_f"] = rows["xmins"] / n_fix
     rows["pos_i"] = rows["pos"].map({p: i for i, p in enumerate(POSITIONS)})
-    # Expected team goals per side from the attack index of the team's midfielders and forwards
     attack = rows[rows["pos_i"] >= 2].groupby("side")["xpts_f"].sum().reindex(range(2 * len(fix_gw)), fill_value=0)
-    lam = BASE_TEAM_GOALS * attack / attack.mean() if attack.mean() > 0 else pd.Series(BASE_TEAM_GOALS, index=attack.index)
-    _, p1, p2 = minutes_states(rows["xmins_f"])
+    lam = rules.team_goals * (attack / attack.mean() if attack.mean() > 0 else 1.0)
+    _, p1, p2 = minutes_states(rows["xmins_f"], params, keeper=rows["pos_i"].to_numpy() == 0)
     return Slots(
         player=players.get_indexer(rows["fpl_id"]),
         pos=rows["pos_i"].to_numpy(),
@@ -106,72 +152,76 @@ def _gw_slots(proj_gw: pd.DataFrame, fix_gw: pd.DataFrame, players: pd.Index) ->
         side=rows["side"].to_numpy(),
         opp_side=rows["opp_side"].to_numpy(),
         xpts=rows["xpts_f"].to_numpy(float),
-        p1=p1,
-        p2=p2,
-        lam=np.clip(lam.to_numpy(float), *LAMBDA_RANGE),
+        p1=np.asarray(p1, float),
+        p2=np.asarray(p2, float),
+        lam=np.clip(np.broadcast_to(np.asarray(lam, float), (2 * len(fix_gw),)), *params.lambda_range).copy(),
     )
 
 
-def _simulate_slots(sl: Slots, rate: np.ndarray, s: int, rng: np.random.Generator, detail: bool = False):
-    """Points per slot, shape (s, slots), for attacking rates `rate` (expected goals per 90 at average team scoring)."""
+def _simulate_slots(sl: Slots, rate, s: int, rng: np.random.Generator, rules: Rules, params: Params, detail: bool = False):
+    """Points per slot, shape (s, slots), for attacking rates `rate` (goals per 90 at his team's expected scoring)."""
     n = len(sl.pos)
+    pos = sl.pos
     goals_side = rng.poisson(sl.lam, size=(s, len(sl.lam)))
     g_for, g_against = goals_side[:, sl.side], goals_side[:, sl.opp_side]
+    lam_for, lam_against = sl.lam[sl.side], sl.lam[sl.opp_side]
     u = rng.random((s, n))
     full = u < sl.p2
     sub = ~full & (u < sl.p2 + sl.p1)
     played = full | sub
-    share = full * (MINS_FULL / 90) + sub * (MINS_SUB / 90)
-    # Each team goal is his with probability (his expected goals / team's expected goals), so he never
-    # outscores his team and his mean is rate x minutes share
-    # Shared with team-mates with probability SHARED_WEIGHT, otherwise an independent draw of the same
-    # size: keeps each player's mean and distribution, weakens team-mate and goal-assist links to observed levels
-    lam_for = sl.lam[sl.side]
+    full_share = params.mins_full / 90
+    share = full * full_share + sub * (params.mins_sub / 90)
     per_team_goal = share / lam_for
 
     def team_goals():
-        return np.where(rng.random((s, n)) < SHARED_WEIGHT, g_for, rng.poisson(lam_for, size=(s, n)))
+        return np.where(rng.random((s, n)) < params.shared_weight, g_for, rng.poisson(lam_for, size=(s, n)))
 
-    goals = rng.binomial(team_goals(), np.clip(rate * ATTACK_GOAL_SHARE[sl.pos] * per_team_goal, 0, MAX_GOAL_SHARE))
-    assist_rate = rate * np.where(sl.pos == 0, 1.0, ASSIST_PER_GOAL[sl.pos])
-    assists = rng.binomial(team_goals(), np.clip(assist_rate * per_team_goal, 0, MAX_ASSIST_SHARE))
-    gk_def = GC_APPLIES[sl.pos]
+    apg = np.array(params.assist_per_goal)
+    goals = rng.binomial(team_goals(), np.clip(rate * ATTACK_GOAL_SHARE[pos] * per_team_goal, 0, params.max_goal_share))
+    assist_rate = rate * np.where(pos == 0, 1.0, apg[pos])
+    assists = rng.binomial(team_goals(), np.clip(assist_rate * per_team_goal, 0, params.max_assist_share))
+    gk_def = GC_APPLIES[pos]
     clean = full & (g_against == 0)
     conceded = np.where(full & gk_def, g_against // 2, 0)
-    saves = np.where(played & (sl.pos == 0), rng.poisson(SAVES_PER_GAME * share / (MINS_FULL / 90)), 0)
-    dc = rng.random((s, n)) < DC_PROB[sl.pos] * share / (MINS_FULL / 90)
-    yellow = played & (rng.random((s, n)) < YELLOW_PROB[sl.pos] * share / (MINS_FULL / 90))
-    red = played & (rng.random((s, n)) < RED_PROB * share)
+    saves = np.where(played & (pos == 0), rng.poisson(params.saves_per_game * share / full_share * lam_against / lam_against.mean()), 0)
+    if rules.defensive_contributions:
+        pressure = 1 + params.dc_per_goal_against * (g_against - lam_against)
+        dc = played & (rng.random((s, n)) < np.clip(np.array(params.dc_prob)[pos] * share / full_share * pressure, 0, 1))
+    else:
+        dc = np.zeros((s, n), dtype=bool)
+    yellow = played & (rng.random((s, n)) < np.array(params.yellow_prob)[pos] * share / full_share)
+    red = played & (rng.random((s, n)) < params.red_prob * share / full_share)
 
     bps = (
         6 * full
         + 3 * sub
-        + BPS_GOAL[sl.pos] * goals
+        + BPS_GOAL[pos] * goals
         + 9 * assists
         + 12 * (clean & gk_def)
         + 2 * saves
         + 5 * dc  # clearances, blocks, interceptions and tackles score BPS too
         - 4 * np.where(full & gk_def, g_against, 0)
         - 3 * yellow
-        + rng.normal(0, 6, (s, n))
+        + rng.normal(0, params.bps_noise, (s, n))
     )
     bps = np.where(played, bps, -np.inf)
     bonus = np.zeros((s, n), dtype=np.int16)
+    rows = np.arange(s)
     for f in np.unique(sl.fixture):
         idx = np.flatnonzero(sl.fixture == f)
         top = np.argsort(-bps[:, idx], axis=1)[:, :3]
         for rank, pts in enumerate((3, 2, 1)):
             if rank < len(idx):
                 cols = idx[top[:, rank]]
-                ok = np.isfinite(bps[np.arange(s), cols])
-                bonus[np.arange(s)[ok], cols[ok]] = pts
+                ok = np.isfinite(bps[rows, cols])
+                bonus[rows[ok], cols[ok]] = pts
 
     points = (
         2 * full
         + 1 * sub
-        + GOAL_PTS[sl.pos] * goals
+        + GOAL_PTS[pos] * goals
         + 3 * assists
-        + CS_PTS[sl.pos] * clean
+        + CS_PTS[pos] * clean
         - conceded
         + saves // 3
         + 2 * dc
@@ -185,35 +235,26 @@ def _simulate_slots(sl: Slots, rate: np.ndarray, s: int, rng: np.random.Generato
     return points.astype(np.int16)
 
 
-MAX_RATE = np.array([0.15, 0.3, 0.8, 1.1])  # goals per 90 by position (keepers: assists) at average team scoring; scaled by fixture
+def _rate_cap(sl: Slots, params: Params) -> np.ndarray:
+    """Highest attacking rate before a full-match player takes `max_goal_share` / `max_assist_share` of his team's goals."""
+    lam_for = sl.lam[sl.side]
+    full_share = params.mins_full / 90
+    apg = np.where(sl.pos == 0, 1.0, np.array(params.assist_per_goal)[sl.pos])
+    goal_cap = np.where(sl.pos == 0, np.inf, params.max_goal_share * lam_for / full_share)
+    return np.minimum(goal_cap, params.max_assist_share * lam_for / (apg * full_share))
 
 
-def _fit_rates(sl: Slots, rng: np.random.Generator, s: int = 4000, iterations: int = 8) -> np.ndarray:
-    """Attacking rate per slot so the simulated mean matches the projection.
-
-    Rates stay in [0, MAX_RATE by position], and the chance of playing absorbs what the rate can't (modifies
-    `sl.p1`, `sl.p2`): if a player's points without attacking returns already exceed his projection,
-    he plays less (rotation risk); if even the maximum rate falls short (typically a projection with
-    almost no minutes but some points), he plays more rather than scoring absurdly when he does.
-    """
-    points_per_goal = GOAL_PTS[sl.pos] * ATTACK_GOAL_SHARE[sl.pos] + (3 + 0.6) * np.where(sl.pos == 0, 1.0, ASSIST_PER_GOAL[sl.pos]) + 0.6
-    blank = (sl.p1 + sl.p2 == 0) & (sl.xpts > 0.05)
-    sl.p1[blank] = 0.01  # projected points but no minutes: give him a chance to come on
+def _fit_rates(sl: Slots, rng: np.random.Generator, rules: Rules, params: Params, s: int = 4000, iterations: int = 6) -> np.ndarray:
+    """Attacking rate per slot so the simulated mean matches the projection, within `_rate_cap`. Minutes are never changed."""
+    apg = np.where(sl.pos == 0, 1.0, np.array(params.assist_per_goal)[sl.pos])
+    exp_share = (sl.p2 * params.mins_full + sl.p1 * params.mins_sub) / 90
+    per_unit = np.maximum(exp_share * (GOAL_PTS[sl.pos] * ATTACK_GOAL_SHARE[sl.pos] + 3.6 * apg + 0.6), 1e-6)
+    can_attack = exp_share > 0.01
+    cap = _rate_cap(sl, params)
     rate = np.zeros(len(sl.pos))
     for _ in range(iterations):
-        mean = _simulate_slots(sl, rate, s, rng).mean(axis=0)
-        per_unit = np.maximum((sl.p2 * MINS_FULL + sl.p1 * MINS_SUB) / 90 * points_per_goal, 1e-6)
-        cap = MAX_RATE[sl.pos] * sl.lam[sl.side] / BASE_TEAM_GOALS  # better fixtures allow more
-        rate = np.clip(rate + (sl.xpts - mean) / per_unit, 0.0, cap)
-        over = (rate == 0) & (mean > sl.xpts) & (mean > 0)
-        under = (rate == cap) & (mean < sl.xpts) & (mean > 0)
-        scale = np.ones(len(sl.pos))
-        scale[over] = np.clip(sl.xpts[over] / mean[over], 0.2, 1.0)
-        scale[under] = np.clip(sl.xpts[under] / mean[under], 1.0, 4.0)
-        total = (sl.p1 + sl.p2) * scale
-        scale = np.divide(scale, total, out=scale, where=total > 1)  # never above certain to play
-        sl.p1 *= scale
-        sl.p2 *= scale
+        mean = _simulate_slots(sl, rate, s, rng, rules, params).mean(axis=0)
+        rate = np.where(can_attack, np.clip(rate + (sl.xpts - mean) / per_unit, 0.0, cap), 0.0)
     return rate
 
 
@@ -226,26 +267,37 @@ def gws_of(projections: pd.DataFrame, H: int) -> list[int]:  # noqa: N803 (S, H 
     return sorted(projections["gw"].unique())[:H]
 
 
-def simulate(projections: pd.DataFrame, fixtures: pd.DataFrame, S: int, H: int, seed: int = 0, chunk: int = 2500) -> np.ndarray:  # noqa: N803 (S, H as in the design doc)
+def simulate(
+    projections: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    S: int,  # noqa: N803 (S, H as in the design doc)
+    H: int,  # noqa: N803
+    seed: int = 0,
+    rules: str | Rules = "2026-27",
+    params: Params = DEFAULT_PARAMS,
+    chunk: int = 2500,
+) -> np.ndarray:
     """Simulated FPL points, int16 `array[S, H, players]`.
 
     `projections`: long table with `gw, fpl_id, pos (G/D/M/F), team_id, xmins, xpts` (e.g. `load_solio`
-    plus `with_team_ids`). `fixtures`: `event, team_h, team_a` (FPL fixtures). The GW axis is the first H
-    GWs in `projections`; the players axis is `player_index(projections)`.
+    plus `with_team_ids`). `fixtures`: `event, team_h, team_a` (FPL fixtures). `rules`: a season in
+    `RULES` or a `Rules`. The GW axis is the first H GWs in `projections`; the players axis is
+    `player_index(projections)`.
     """
+    rules = RULES[rules] if isinstance(rules, str) else rules
     rng = np.random.default_rng(seed)
     players = player_index(projections)
     gws = gws_of(projections, H)
     out = np.zeros((S, len(gws), len(players)), dtype=np.int16)
     for h, gw in enumerate(gws):
-        sl = _gw_slots(projections[projections["gw"] == gw], fixtures[fixtures["event"] == gw], players)
+        sl = _gw_slots(projections[projections["gw"] == gw], fixtures[fixtures["event"] == gw], players, rules, params)
         if sl is None:
             continue
-        rate = _fit_rates(sl, rng)
+        rate = _fit_rates(sl, rng, rules, params)
         # A player has at most one slot per fixture; add doubles occurrence by occurrence
         occurrence = pd.Series(sl.player).groupby(sl.player).cumcount().to_numpy()
         for start in range(0, S, chunk):
-            pts = _simulate_slots(sl, rate, min(chunk, S - start), rng)
+            pts = _simulate_slots(sl, rate, min(chunk, S - start), rng, rules, params)
             for occ in range(occurrence.max() + 1):
                 sel = occurrence == occ
                 out[start : start + pts.shape[0], h, sl.player[sel]] += pts[:, sel]
@@ -277,7 +329,7 @@ def with_team_ids(projections: pd.DataFrame, teams) -> pd.DataFrame:
 
 
 def match_report(projections: pd.DataFrame, points: np.ndarray, H: int) -> pd.DataFrame:  # noqa: N803 (S, H as in the design doc)
-    """Simulated vs projected mean per player and GW, with the Monte Carlo standard error."""
+    """Simulated vs projected mean per player and GW, with the Monte Carlo standard error and `top10` (top 10 xP that GW)."""
     players = player_index(projections)
     gws = gws_of(projections, H)
     rows = []
@@ -286,5 +338,18 @@ def match_report(projections: pd.DataFrame, points: np.ndarray, H: int) -> pd.Da
         sim = points[:, h, :].astype(float)
         frame = pd.DataFrame({"gw": gw, "fpl_id": players, "sim_mean": sim.mean(axis=0), "se": sim.std(axis=0) / np.sqrt(len(sim))})
         frame["xpts"] = p["xpts"].reindex(players).to_numpy()
+        frame["top10"] = frame["xpts"].rank(ascending=False, method="first") <= 10
         rows.append(frame)
     return pd.concat(rows, ignore_index=True)
+
+
+def match_summary(report: pd.DataFrame, tolerance: float = 0.2) -> dict:
+    """Share of player-GWs whose simulated mean misses the projection by more than `tolerance`, overall and top 10 by xP."""
+    live = report[report["xpts"] > 0]
+    miss = (live["sim_mean"] - live["xpts"]).abs() > tolerance
+    top = live[live["top10"]]
+    return {
+        "share_off": float(miss.mean()),
+        "share_off_top10": float(miss[live["top10"]].mean()) if len(top) else float("nan"),
+        "top10_mean_gap": float((top["sim_mean"] - top["xpts"]).mean()) if len(top) else float("nan"),
+    }

@@ -62,9 +62,10 @@ def test_team_mates_rise_together_and_defenders_share_clean_sheets():
     proj, fixtures = _league()
     gw1 = proj[proj["gw"] == 1]
     players = sc.player_index(gw1)
-    sl = sc._gw_slots(gw1, fixtures[fixtures["event"] == 1], players)
+    rules, params = sc.RULES["2026-27"], sc.DEFAULT_PARAMS
+    sl = sc._gw_slots(gw1, fixtures[fixtures["event"] == 1], players, rules, params)
     rng = np.random.default_rng(3)
-    pts, parts = sc._simulate_slots(sl, sc._fit_rates(sl, rng), 20000, rng, detail=True)
+    pts, parts = sc._simulate_slots(sl, sc._fit_rates(sl, rng, rules, params), 20000, rng, rules, params, detail=True)
     team = gw1.set_index("fpl_id")["team_id"].reindex(players).to_numpy()[sl.player]
     pos = sl.pos
     attackers = np.flatnonzero((team == 1) & (pos >= 2))
@@ -82,7 +83,8 @@ def test_minutes_states_are_probabilities():
     p0, p1, p2 = sc.minutes_states([0, 10, 45, 70, 90, 120])
     np.testing.assert_allclose(p0 + p1 + p2, 1)
     assert (np.array([p0, p1, p2]) >= 0).all()
-    assert p0[0] == 1 and p2[4] == 1
+    assert p0[0] == 1  # xMins 0 = out
+    assert (np.diff(p2) >= 0).all() and 0.85 < p2[4] < 1  # even nailed starters miss some games (2023-24 table)
 
 
 def test_with_team_ids_matches_name_variants():
