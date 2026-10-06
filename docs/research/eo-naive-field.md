@@ -15,13 +15,18 @@ in `tests/test_naive_field.py` (synthetic data only). Pass criteria are the ones
 - Most of that gain is in **who starts and who is captain**, not in **who is owned**. Ownership error
   is about level with persistence (AE64 7.7 vs 8.5 points, E64 5.4 vs 5.2). Persistence also carries
   last week's chip EO (bench boosts, triple captains) into a week where most managers have no chip.
-- The cheap blend is about as good as persistence on EO (AE64 10.8-11.9 vs 12.1; E64 8.4-9.3 vs 8.7).
+- The cheap blend is about as good as persistence on EO (AE64 10.7-11.9 vs 12.1; E64 8.4-9.3 vs 8.7).
   It is only a little closer to the per-manager forecast than persistence is (EO 8-12 points apart, vs
   11-14 for persistence). Its biggest gap is that it keeps last week's XI and captaincy. Re-picking
   those, as the per-manager solves do, is the next step (see "Agreed approach" in `eo-projector.md`).
 - Chips were heavy (GW3: 60 of 64 AE64 managers played one). Only the wildcard is modelled. Split by
   chip use, the EO gain holds for managers who played no chip (AE64 7.4 vs 14.1 points, E64 9.8 vs
   13.3), but their ownership error is slightly worse than persistence: see "Chips" below.
+
+**Update (2026-10-06, `eo-blend.md`)**: the critique's checks show the per-manager EO gain is the XI and captain
+re-pick. Re-picking XI and captain on each manager's current squad from next-GW xP, with no solver and no transfers,
+scores 7.3 / 5.8 against the `banked` solve's 7.9 / 6.1. The `cheap_wcshare` numbers below are corrected for a
+leave-one-out bug (`eo-blend.md`, "Fixes to #38").
 
 ## Data
 
@@ -86,8 +91,8 @@ API calls served from our collected tables instead of the live API (`team_state`
 Every state goes through his `run/solve.py::solve_regular`, called the way his `run/simulations.py`
 calls it (`_solve_one`): projections written to his data folder, `team_data = json_string`, API
 payloads served from our snapshots, his result CSVs sent to a temp folder. His settings files are
-used unchanged (decay 0.9, FT values, no transfers in the last 2 GWs of the horizon, hits allowed at 4
-points, no chips unless forced, `gap` 0) except:
+used unchanged (decay 0.9, FT values, no transfers in the last 2 GWs of the horizon, no hits (his
+`weekly_hit_limit` is 0, so `hit_cost` 4 never applies), no chips unless forced, `gap` 0) except:
 
 | Option | Value | Why |
 |---|---|---|
@@ -192,7 +197,7 @@ EO error (points); ownership error in brackets.
 | persistence | 6.4 (0.1) | 18.4 (20.3) | 13.2 (9.4) | 10.7 (5.2) | 12.1 (8.8) |
 | per-manager `mix` | **3.8** (0.9) | **13.8** (17.4) | **5.7** (5.8) | **6.7** (6.6) | **7.5** (7.7) |
 | `cheap` | 13.5 (16.2) | 15.7 (17.5) | 10.3 (8.7) | 8.1 (6.6) | 11.9 (12.3) |
-| `cheap_wcshare` | 7.9 (5.0) | 14.8 (17.1) | 11.2 (8.9) | 9.2 (4.7) | 10.8 (8.9) |
+| `cheap_wcshare` | 7.9 (5.0) | 14.6 (16.8) | 11.2 (8.8) | 8.8 (5.9) | 10.7 (9.1) |
 | `cheap_approx` | 13.5 (16.6) | 14.8 (16.4) | 10.1 (11.8) | 9.3 (11.9) | 11.9 (14.2) |
 
 | E64 | GW2 (clean) | GW3 | GW4 | GW5 | mean |
@@ -226,7 +231,7 @@ Mean EO gap to the per-manager forecasts, GW2-5 (points):
 |---|---|---|---|---|
 | persistence | 14.3 | 11.2 | 10.6 | 9.3 |
 | `cheap` | 12.1 | 10.4 | 9.7 | 8.6 |
-| `cheap_wcshare` | **9.8** | 11.4 | 8.5 | 8.4 |
+| `cheap_wcshare` | **9.6** | 11.2 | 8.5 | 8.4 |
 | `cheap_approx` | 10.2 | **9.9** | **8.1** | **8.4** |
 | `banked` (for scale) | 4.7 | 0 | 2.5 | 0 |
 

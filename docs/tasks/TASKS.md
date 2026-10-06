@@ -55,6 +55,7 @@ rest (team, projections, settings, solve, simulations). The one documented way t
 | # | Task | Brief | Status |
 |---|---|---|---|
 | EO1 | EO projector refit (per-group flow model with ΔEV and price-band gap; `docs/research/eo-projector.md`), then wire into `--eo` | (none) | IN PROGRESS |
+| EO1b | Wire the EO blend result into `--eo`: fair persistence re-picked on next-GW xP (`eo-blend.md`); improve captain herding | (none) | TODO |
 | B04b-1a | Refit the one-step EO model on 2025-26 with D1's `ep_next`; backtest vs persistence (GW10-38, AE64 and E64) | B04b | TODO |
 | B04b-1b | Add blank/double, banked-FT and chip-week covariates; backtest by week type | B04b | TODO |
 | B04b-1c | Captaincy: refit τ per group on 38 GWs of captain counts | B04b | TODO |
