@@ -97,3 +97,15 @@ def test_with_team_ids_matches_name_variants():
     assert sc.with_team_ids(proj, teams)["team_id"].tolist() == [1, 2, 3, 3]
     with pytest.raises(ValueError):
         sc.with_team_ids(pd.DataFrame({"team": ["Atlantis"]}), teams)
+
+
+def test_calibration_scores():
+    from fplrank.sim.calibration import _scores
+
+    sure = np.full((1000, 1), 5.0)
+    log_hit, crps_hit = _scores(sure, np.array([5.0]))
+    log_miss, crps_miss = _scores(sure, np.array([9.0]))
+    assert crps_hit[0] == pytest.approx(0) and crps_miss[0] == pytest.approx(4)
+    assert log_hit[0] < 0.1 < log_miss[0]
+    spread = np.random.default_rng(0).integers(0, 11, (4000, 1)).astype(float)
+    assert _scores(spread, np.array([5.0]))[1][0] < crps_miss[0]  # a wide forecast beats a confident wrong one

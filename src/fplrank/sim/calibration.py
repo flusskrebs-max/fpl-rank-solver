@@ -36,6 +36,33 @@ THRESHOLDS = {"P(<=2)": lambda x: x <= 2, "P(>=10)": lambda x: x >= 10, "P(>=15)
 TRAIN, TEST, CHECK = "2023-24", "2024-25", "2025-26"
 SUPPORT = np.arange(-10, 61)  # points support for the log score
 
+CONCLUSION = """\n## Conclusion (written 2026-10-06 from the run below, 1,000 scenarios per GW)
+
+**Neither model passes all criteria on the held-out season (2024-25).**
+
+- **Engine:** best log score (1.56 vs 1.66) and matches projections best (69% of player-GWs within
+  0.2 of xP vs 47%); attacker correlation in band; top-10 haul rates in band. But ordinary players
+  haul too often: P(>=10) 4.0% vs 2.9% actual, P(>=15) 1.3% vs 0.6% (defenders and midfielders
+  worst), and top-10 players average 0.27 below xP with too many blanks.
+- **Empirical benchmark:** haul rates in band for most positions (6/8 checks), top-10 mean within
+  0.01 of xP, slightly better CRPS (0.92 vs 0.93). But its means follow xP only by band, and
+  attacker correlation is out of band.
+- **Both** underestimate defence correlation (team-mates sharing clean sheets).
+- 2025-26 (final check): same pattern; the benchmark passes every criterion there.
+
+**Recommendation (criterion 4):** the engine does not beat the benchmark on hauls, which matter most
+for a rank objective, so use the empirical benchmark for haul-sensitive decisions for now, and keep the
+engine for its better means and correlation structure. Next fixes for the engine: haul frequency for
+non-premium players (likely bonus allocation and the binomial goal model's variance), top-10 blanks,
+and defence correlation.
+
+What changed since B07: minutes from an empirical table (no more adjusting minutes to match means),
+separate keeper minutes, keeper assists capped, per-season rules (defensive contributions only from
+2025-26) and team scoring from the previous season, every constant in `Params`. Most of the gain
+came from better projected minutes in the calibration input (recent minutes alone ignore team news).
+
+"""  # update by hand after each run
+
 # Pass criteria for the held-out season, fixed before it was run (B07b "Done when")
 PASS_CRITERIA = """\
 On the held-out season (2024-25), with 90% bootstrap bands over GWs:
@@ -379,9 +406,10 @@ benchmark: `fplrank.sim.calibration.Empirical`. Both fitted on {TRAIN} only.
 **Inputs.** Projection = vaastav `xP` (FPL's expected points; well calibrated where present: mean xP
 vs points 1.05/1.09 in 2023-24, 1.18/1.22 in 2024-25, 1.19/1.20 in 2025-26). It is stored as 0 in
 GWs where FPL did not publish it, so only GWs with xP are used (from GW5, for minutes history).
-xMins = average minutes per fixture over the previous 4 GWs (vaastav has no projected minutes).
+xMins (vaastav has none) = the training season's average minutes for the same keeper/outfield x xP band x
+recent-minutes band (`projected_minutes`): pre-deadline information, like a projection's xMins.
 
-## Pass criteria (fixed before the held-out season was run)
+{CONCLUSION}## Pass criteria (fixed before the held-out season was run)
 
 {PASS_CRITERIA}
 
