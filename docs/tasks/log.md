@@ -45,3 +45,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, plan v2: queue cut into one-PR slices grouped into releases v0.1-v0.4 (`docs/roadmap.md`);
   data-source review added (`docs/research/data-sources.md`): vaastav no longer updates weekly, so
   FPL-Core-Insights `ep_next` replaces B04b's proxy and joins S2's variance table; notes moved to this file.
+- 2026-10-06, critical review of the S2 plan (triaged in another thread): gap now uses the line's drift against the EO group
+  (no double-counted field growth); μ shrunk by κ = 0.3; season total = plan horizon + λ = 0 base; new V1 (realised spread) and
+  S1c (EO at the deadline); C1 moved to v0.1; S2b bands by xP quantile; S1 docstring: centring at EO = 1 is a scale choice.

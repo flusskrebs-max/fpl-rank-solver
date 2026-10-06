@@ -1,6 +1,6 @@
 # C1: Sampled top-10k set in the collector
 
-Status: Ready · Size: small · Release: v0.3 · Depends on: nothing (C0 is in the same file)
+Status: Ready · Size: small · Release: v0.1 (moved 2026-10-06: history can't be backfilled) · Depends on: nothing (C0 is in the same file)
 
 ## Why
 

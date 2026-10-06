@@ -28,7 +28,7 @@ the provider's own pages.
    with `ep_next`, `ep_this`, `selected_by_percent`, `transfers_in_event`, `transfers_out_event`,
    `now_cost`, `cost_change_event`, status/news, set-piece order and defensive contribution (checked).
    Its `ep_next` at gw = N tracks vaastav `xP` for GW N closely (correlation 0.92-0.97, mean absolute
-   difference 0.2-0.45 points over the 10 GWs where both exist; checked). The exact snapshot time isn't
+   difference 0.2-0.45 points over the 10 GWs where both exist; checked; D1 re-checks the offset). The exact snapshot time isn't
    documented, so treat it as "FPL's own xP, roughly at the deadline" and say so in reports.
    2026-27 GW1-5 is there too. No licence file; the author asks for a link back.
    - **B04b**: use this `ep_next` as the projection for every 2025-26 GW instead of building a
@@ -51,17 +51,21 @@ the provider's own pages.
 
 | Source | Gives | Access | Verdict |
 |---|---|---|---|
-| **Our collector, extended** | Exact EO for any manager set | FPL API, already running | **P1.** Add a sampled top-10k set (e.g. 1 in 10 of ranks 1-10,000 from standings pages, ~1,000 managers) and, if wanted, top 100k (1 in 100). A 1,000-manager sample gives EO to about ±1.5 points at 50%. Cost: one more collector run of the same size as top 1000; config change plus a sampling option in `members()` |
+| **Our collector, extended** | Exact EO for any manager set | FPL API, already running | **P1, v0.1 (C1)**, since this season's top-10k history can't be backfilled later. Add a sampled top-10k set (e.g. 1 in 10 of ranks 1-10,000 from standings pages, ~1,000 managers) and, if wanted, top 100k (1 in 100). A 1,000-manager sample gives EO to about ±1.5 points at 50%. Cost: one more collector run of the same size as top 1000; config change plus a sampling option in `members()` |
 | [LiveFPL rank tiers](https://plan.livefpl.net//rank_tiers) / [Top 10k](https://plan.livefpl.net//top10k) | Live EO for overall, top 100, 1k, 10k, 100k and wider brackets; top-10k captaincy and chip use | Free web pages, no API or published method; current GW only | **P2, manual check only.** Use to sanity-check our sampled top-10k EO for a GW or two. Don't scrape it into the pipeline |
 | [FPL Review Elite 1000](https://docs.fplreview.com/team-analysis/elite-1000/) | Ownership, EO, captaincy and chips for a fixed list of 1,000 long-run elite managers | Web; CSV export is a premium (Patreon) feature | **P3.** Overlaps what the collector does; only worth it if we want their fixed "all-time elite" list, which LiveFPL also shows ([All-Time Best](https://plan.livefpl.net/league_stats/elite)) |
 | Historical top-10k EO (past seasons) | n/a | The FPL API only returns picks for the current season, and I found no public archive | **Not available.** 2025-26 elite history stays limited to the Elite 64 graphics; from now on the collector builds our own archive, so keep it running every GW |
+| **Collector picks + per-GW points** | Realised relative score Δ = Σ (m − EO) × pts per manager per GW | Have | **P1, S2 calibration (V1)**: checks S2's σ against what real top-1000 and Elite 64 squads did |
+
+Collector EO for GW N exists only after the GW N deadline, so EO *at* the deadline is a forecast: S1c
+uses B04's one-step forecast for the GW being decided.
 
 ### Rank cut-offs (S2)
 
 | Source | Gives | Verdict |
 |---|---|---|
-| Collector `thresholds` | T_X every GW this season | Have. Add rank 100,000 to `threshold_ranks` (one more page per run) so S2 has a wider curve |
-| `past` field of entry history | Final points of today's managers in past seasons | Have. Top 100 needs a deeper sample (parked B03b leftover) |
+| Collector `thresholds` | T_X every GW this season | Have (rank 100,000 added by C0). S2 uses the line's **drift against the EO group** this season (line GW gain − group mean GW points), not past cut-offs, for the gap; past per-GW cut-off curves aren't available anywhere |
+| `past` field of entry history | Final points of today's managers in past seasons | Have. Only gives the indicative absolute line at GW38 for the report (`rank.target.target_line`). Top 100 coverage is thin (parked B03b leftover) |
 | LiveFPL rank tiers | Live average points per tier | Manual cross-check only |
 
 ### Projections (S1)
@@ -72,6 +76,9 @@ the provider's own pages.
 | **FPL `ep_next`** | One-GW xP for every player | Free, in `bootstrap-static` (and Core Insights history) | **P1 as a fallback / test input**: lets S1's CLI and tests run when no Solio file is present, and in cloud sessions via Core Insights |
 | [FPL Review](https://docs.fplreview.com/getting-started/premium-features/) | Multi-GW xP, "Massive Data" model, 14-GW horizon | Free planner; CSV export is premium | **P3**: a second opinion if we want to test sensitivity of λ to the projection source. Same export shape as Solio is likely, since open-fpl-solver reads both |
 | Fantasy Football Hub, Fantasy Football Fix, FPL Copilot | Projections | Paid (Hub, Fix); Copilot free table, no documented export | Skip for now |
+
+`ep_next`, vaastav `xP` and Solio are not on one scale, so anything keyed on xP across sources (S2b's
+variance table) bands by within-source quantile, not raw xP.
 
 ### Team strength and fixtures (B04b multi-GW, projection sanity)
 

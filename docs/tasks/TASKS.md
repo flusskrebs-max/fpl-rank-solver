@@ -15,26 +15,28 @@ The plan and release order are in `docs/roadmap.md`; finished-task notes are in 
 | # | Task | Brief | Status |
 |---|---|---|---|
 | S1 | Ownership-weighted solver: xP·(1 + λ(EO − 1)), λ sweep with EV cost, CLI | S1 | DONE (PR #14) |
-| C0 | Collector: add rank 100,000 to `threshold_ranks` (one config line) | C0 | TODO |
-| S1b | Free fallback projections from FPL `ep_next`, so S1 runs without a Solio file (and in cloud tests) | S1b | TODO |
+| C0 | Collector: add rank 100,000 to `threshold_ranks` (one config line) | C0 | IN REVIEW (PR #16) |
+| C1 | Collector: sampled top-10k set (1 in 10 of ranks 1-10,000), so S1/S2 can use `--eo top10k` (moved from v0.3: this season's history can't be backfilled later; AE64 stays S1's default) | C1 | TODO |
+| S1b | Free fallback projections from FPL `ep_next`, so S1 runs without a Solio file (and in cloud tests); offline test on a saved real team | S1b | TODO |
+| S1c | EO at the deadline: `--eo-forecast` uses the B04 one-step forecast (`eo_mean`); by default λ applies to the first GW of the horizon only | S1c | TODO |
 | W1 | `docs/weekly-run.md`: the pre-deadline steps on Alex's PC (download Solio, register, run S1) | (none) | TODO |
 
 ## v0.2 Pick λ for me
 
 | # | Task | Brief | Status |
 |---|---|---|---|
-| S2a | Target line: T_X now (collector) + projected growth to GW38 from past cut-offs; `target_line(rank, gw)` | S2 | TODO |
+| S2a | Gap: T_X now + drift of the line against the EO group this season; `target_line` kept as the indicative absolute line (report only) | S2 | TODO |
 | D1 | Loader for FPL-Core-Insights `playerstats.csv` (2025-26, 2026-27): per-GW `ep_next`, ownership, transfers | D1 | TODO |
-| S2b | Variance table v(xP) by position × xP band from 2023-24, 2024-25 and 2025-26 (D1's `ep_next` as xP) | S2 | TODO |
+| S2b | Variance table v(xP) by position × within-source xP quantile (not raw xP) from 2023-24, 2024-25 and 2025-26 (D1's `ep_next` as xP) | S2 | TODO |
+| V1 | Realised-spread check: per-GW realised Δ = Σ (m − EO) × pts for top-1000 and Elite 64 managers this season vs S2's σ for the same squads; within ~20% → s = 1, else set s to match. Also outputs drift and σ²_base | V1 | TODO |
 | S2c | `choose_lambda` + one-line report; CLI takes target rank and our points or rank | S2 | TODO |
 
 ## v0.3 Better EO
 
 | # | Task | Brief | Status |
 |---|---|---|---|
-| C1 | Collector: sampled top-10k set (1 in 10 of ranks 1-10,000), so S1/S2 can use `--eo top10k` | C1 | TODO |
 | B04b-1 | Refit the one-step EO model on 2025-26 with D1's `ep_next`; backtest vs persistence by week type | B04b | TODO |
-| B04b-2 | Multi-GW EO forecast (1/3/6 GWs ahead) and wire it into S1 in place of "this GW's EO repeated" | B04b | TODO |
+| B04b-2 | Multi-GW EO forecast (1/3/6 GWs ahead) and wire it into S1 (S1c already does one step) | B04b | TODO |
 
 ## v0.4 Weekly report
 

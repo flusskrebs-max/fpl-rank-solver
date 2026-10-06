@@ -5,11 +5,11 @@ Each projection is scaled by how much the target field owns the player:
     xP' = xP x (1 + λ x (EO - 1))
 
 EO is effective ownership as a fraction (1.5 = 150%, captaincy included). λ > 0 favours players the
-field owns (covering), λ < 0 favours differentials. It is centred at EO = 1 because a point scored by
-a player the field owns exactly once moves our rank by nothing whether or not we own him, so such a
-player is left alone; centring also keeps the adjusted values on the same scale as raw xP, so λ
-changes *which* players are picked rather than how keen the solver is on hits. The term is linear,
-as HiGHS needs (solver-design §1, §4 [C]).
+field owns (covering), λ < 0 favours differentials. The term is a linear proxy for the variance of our
+score relative to the field, which HiGHS can't take directly (solver-design §1, §4 [C]). Centring at
+EO = 1 is a scale choice, not a neutral point: it keeps adjusted values near raw xP, so λ mostly changes
+*which* players are picked rather than how keen the solver is on hits. (For variance, owning a player
+once is neutral at EO 0.5 and captaining him at EO 1.5.)
 
 Every plan is then scored on the raw projections: its EV, its EV cost against λ = 0, how much of the
 field's EO it holds, and its exposure (xP-weighted distance from the field), which S2 will use.

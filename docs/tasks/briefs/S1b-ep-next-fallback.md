@@ -17,6 +17,8 @@ registered and lets tests and cloud sessions run S1 end to end.
 2. S1 CLI: `--projections solio|ep_next` (default: latest Solio if registered for this GW, else
    `ep_next` with a printed warning).
 3. A test that runs S1 on a saved `bootstrap-static` fixture with `ep_next` projections, offline.
+4. Save one real mid-season `my_data` + `bootstrap-static` (+ fixtures) as a test fixture; run S1 offline
+   with `ep_next`, horizon 4, and assert the λ = 0 plan equals `solve_ev`'s.
 
 ## Done when
 

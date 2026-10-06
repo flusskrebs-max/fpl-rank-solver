@@ -13,9 +13,9 @@ Each release is something Alex can run for a real deadline. Ship it, use it once
 
 | Release | Alex can… | Tasks | Exit |
 |---|---|---|---|
-| **v0.1 Risk knob** | Run the EV solve with a λ knob and see plans across λ with their EV cost | S1, C0, S1b, W1 | Used for one real GW deadline |
-| **v0.2 Pick λ for me** | Enter target rank + points; get λ, P(target) vs the EV plan, EV cost | S2a, D1, S2b, S2c | Sensible λ across a grid of gaps and GWs left (S2 checks); used for one GW |
-| **v0.3 Better EO** | Use top-10k EO and a forecast of how elite EO moves over the horizon | C1, B04b-1, B04b-2 | Forecast beats persistence out of sample; S1 uses it |
+| **v0.1 Risk knob** | Run the EV solve with a λ knob and see plans across λ with their EV cost | S1, C0, C1, S1b, S1c, W1 | Used for one real GW deadline |
+| **v0.2 Pick λ for me** | Enter target rank + points; get λ, P(target) vs the EV plan, EV cost | S2a, D1, S2b, V1, S2c | Sensible λ across a grid of gaps and GWs left (S2 checks); used for one GW |
+| **v0.3 Better EO** | Use a forecast of how elite EO moves over the horizon | B04b-1, B04b-2 | Forecast beats persistence out of sample; S1 uses it |
 | **v0.4 Weekly report** | One command (or a schedule) produces the GW report | R1 | Used for 3 consecutive GWs |
 
 After v0.4: check S2's normal approximation against simulation and backtests (parked list in TASKS.md),
