@@ -55,3 +55,15 @@ def test_target_picks_a_lambda_and_prints_his_plan(request_fn, capsys, monkeypat
     assert "P by λ:" in out and "P(top 10,000)" in out
     assert "--- Sertalp's solver, plan for λ = " in out
     assert out.count("Result") == 1  # only the chosen plan's output is shown
+
+
+@pytest.mark.slow
+def test_sims_run_his_simulations_at_the_fixed_lambda(request_fn, capsys):
+    ids = [e["id"] for e in request_fn(cli.BOOTSTRAP)["elements"]]
+    eo = pd.Series(1.5, index=ids[:40])
+    load_eo = lambda group, bootstrap, gw: (eo, f"{group} test")  # noqa: E731
+    assert cli.solve([*HIS_FLAGS, "--eo", "AE64", "--lam", "0.1", "--sims", "2"], request_fn, load_eo) == 0
+    out = capsys.readouterr().out
+    assert "--- Sertalp's simulations: 2 runs ---" in out
+    assert "Processing for GW 6 with wildcard." in out  # his sensitivity summary (preseason wildcard)
+    assert "Number of plans: 2" in out and "Goalkeepers:" in out

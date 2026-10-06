@@ -3,17 +3,24 @@
     uv run fplrank solve [his flags]                                  # exactly his solver
     uv run fplrank solve [his flags] --eo AE64 --target 10000          # λ with the best P(top 10,000)
     uv run fplrank solve [his flags] --eo AE64 --lam 0.1               # a fixed λ
+    uv run fplrank solve [his flags] --eo AE64 --target 10000 --sims 50  # plus his simulations at that λ
 
 His flags (horizon, use_wc, banned, team_id, ...) and his settings files are passed to his
 `run/solve.py::solve_regular` unchanged. With `--eo`, his projections are read as usual and scaled by
 xP x (1 + λ x (EO - 1)) for the next GW only (`opt.ownership`), once per λ. The plan with the best
 P(reaching the target line) (`opt.rank_goal`) is printed with his normal output under a short λ block.
+
+`--sims N` then does what his `run/simulations.py` does, at the chosen λ: N runs of `solve_regular` with
+`randomized` on (his noise, applied to the λ-scaled projections), followed by his `run/sensitivity.py`
+summary of the plans those runs saved.
 """
 
 import argparse
 import contextlib
 import io
+import shutil
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 
@@ -49,11 +56,12 @@ def live_request():
     return request
 
 
-def run(argv: list[str], adjust=None, request=None, quiet: bool = False) -> Run:
+def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime_options: dict | None = None) -> Run:
     """Run his `solve_regular` with `argv` as his command line.
 
     adjust(projections, options) -> projections changes his projections after he reads them.
     quiet: capture what he prints in `Run.output` instead of printing it.
+    runtime_options: handed to `solve_regular` the way his simulations script does.
     """
     solve = _solve_module()
     from dev import data_parser, solver
@@ -82,10 +90,42 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False) -> Run:
             _patched(data_parser, **requests),
             contextlib.redirect_stdout(out) if quiet else contextlib.nullcontext(),
         ):
-            solve.solve_regular()
+            solve.solve_regular(runtime_options)
     finally:
         sys.argv = argv_was
     return Run(solved[0][0], seen["options"], seen["projections"], out.getvalue())
+
+
+def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None) -> None:
+    """His `run/simulations.py` (n runs of `solve_regular` with `randomized` on), then his `run/sensitivity.py`
+    summary for GW `gw`.
+
+    The runs go one at a time in this process (his default of 1 process) so `adjust` applies to each. His
+    results folder is left as is; only the plans these runs saved are copied out and summarised.
+    """
+    solve = _solve_module()
+    import sensitivity
+
+    results = solve.DATA_DIR / "results"
+    results.mkdir(exist_ok=True)
+    before = set(results.glob("*.csv"))
+    options, start = {}, time.perf_counter()
+    print(f"\n--- Sertalp's simulations: {n} runs ---")
+    for i in range(1, n + 1):
+        options = run(argv, adjust, request, quiet=True, runtime_options={"run_no": str(i), "randomized": True}).options
+        print(f"  {i}/{n} done ({time.perf_counter() - start:.0f}s)", flush=True)
+    wildcard = options.get("preseason") or gw in (options.get("use_wc") or [])
+    with tempfile.TemporaryDirectory() as tmp:
+        for f in set(results.glob("*.csv")) - before:
+            shutil.copy(f, tmp)
+        sensitivity.input = lambda *_: "n"  # his "Show top N results (y/n)?" prompt: show all
+        try:
+            if wildcard:
+                sensitivity.process_wildcard_transfers(gw, tmp)
+            else:
+                sensitivity.process_regular_transfers(gw, tmp)
+        finally:
+            del sensitivity.input
 
 
 def next_gw(options: dict, bootstrap: dict) -> int:
@@ -104,6 +144,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--target", type=int, help="target overall rank: choose the λ with the best P(finishing at or above it)")
     p.add_argument("--lam", type=float, help="fix λ instead of choosing it (0 = his EV plan)")
     p.add_argument("--points", type=int, help="our total points now, for --target (default: from the FPL API)")
+    p.add_argument("--sims", type=int, help="then run his simulations N times at the chosen λ and print his summary")
     return p
 
 
@@ -112,7 +153,9 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     ours, theirs = p.parse_known_args(argv)
     request = request or live_request()
     if ours.eo is None and ours.target is None and ours.lam is None:
-        run(theirs, request=request)
+        r = run(theirs, request=request)
+        if ours.sims:
+            simulate(theirs, ours.sims, next_gw(r.options, request(BOOTSTRAP)), request=request)
         return 0
     if ours.target is None and ours.lam is None:
         p.error("--eo needs --target (to choose λ) or --lam (to fix it)")
@@ -159,6 +202,9 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
         print(f"λ = {chosen:g} (fixed), EV cost {cost:.1f} points")
     print(f"\n--- Sertalp's solver, plan for λ = {chosen:g} ---")
     print(runs[chosen].output)
+    if ours.sims:
+        adjust = None if chosen == 0 else lambda proj, _: ownership.adjust_projections(proj, eo, chosen, gw)
+        simulate(theirs, ours.sims, gw, adjust, request)
     return 0
 
 
@@ -166,7 +212,7 @@ def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     sys.stdout.reconfigure(encoding="utf-8")  # player names and λ on the Windows console
     if not argv or argv[0] != "solve":
-        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N]")
+        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--sims N]")
         return 2
     return solve(argv[1:])
 
