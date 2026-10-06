@@ -40,8 +40,12 @@ def _path(kind: str, source: str, season: str) -> Path:
 
 
 def available() -> list[tuple[str, str]]:
-    """(source, season) pairs that have an EO file, e.g. [("elite64", "2026-27")]."""
-    return sorted(tuple(p.stem.split("_eo_")) for p in ELITE_DIR.glob("*_eo_*.csv"))
+    """(source, season) pairs that have an EO file, e.g. [("elite64", "2026-27")].
+
+    Only `<source>_eo_<YYYY-YY>.csv` counts; derived files such as `elite64_eo_calculated_2025-26.csv` don't.
+    """
+    pairs = (p.stem.split("_eo_", 1) for p in ELITE_DIR.glob("*_eo_*.csv"))
+    return sorted((source, season) for source, season in pairs if _SEASON.match(season))
 
 
 def load_eo(source: str = "elite64", season: str = "2026-27") -> pd.DataFrame:
