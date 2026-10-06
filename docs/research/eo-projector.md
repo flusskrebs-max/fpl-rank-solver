@@ -1,6 +1,6 @@
 # EO projector: proposal (2026-10-06)
 
-Status: proposal, nothing built. Scope: this project builds only the EO projection and the λ
+Status: proposal. Idea 1 built and tested 2026-10-06: fails the pass criteria (`eo-flow-v1.md`). Scope: this project builds only the EO projection and the λ
 choice; Sertalp's solver runs unchanged. This note covers Alex's three ideas (thread "EO projector",
 2026-10-06) and which to try first.
 
