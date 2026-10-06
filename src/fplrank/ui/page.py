@@ -191,6 +191,7 @@ def results(output: str) -> None:
         st.subheader("P by λ")
         chart = pd.DataFrame({"λ": [f"{k:g}" for k in sorted(ps)], "P": [ps[k] for k in sorted(ps)]}).set_index("λ")
         st.bar_chart(chart, y="P")
+        st.caption("λ below 0 leans towards differentials (more risk against the field); above 0 towards players the field owns.")
     st.subheader("Full output")
     st.code(output, language=None)
 
@@ -216,7 +217,9 @@ def main() -> None:
         first = "Solving λ = 0" + (" and the wildcard templates" if choices.mode != "plain" and choices.eo_drift else "")
         code, output = run(args, st.empty(), st.progress(0.0, text=first))
         status.update(
-            label="Done" if code == 0 else f"Stopped with an error (exit code {code})", state="complete" if code == 0 else "error"
+            label="Done" if code == 0 else f"Stopped with an error (exit code {code})",
+            state="complete" if code == 0 else "error",
+            expanded=code != 0,  # done: fold the live log away so the result sits right under it
         )
     st.session_state["output"] = output
     results(output)
