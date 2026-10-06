@@ -4,24 +4,31 @@ Maintained by Claude Code (PM + developer; see "How we work" in `CLAUDE.md`). La
 Take the top task that isn't DONE. Open briefs are in `briefs/` next to this file; finished ones in `docs/briefs/`.
 
 **When you finish or get stuck:** set the status (`DONE (PR #n)`, `IN PROGRESS (branch)`, `BLOCKED: why`),
-add a dated line under "Notes from Claude Code", and move a finished task's brief to the repo's
-`docs/briefs/`. Don't reorder or delete tasks; the PM tidies the list.
+add a dated line under "Notes from Claude Code", and move a finished task's brief to `docs/briefs/`.
 
 ## Queue
 
+Plan agreed with Alex at the 2026-10-06 stock take: three core products, simple first, iterate.
+(1) an ownership-weighted EV solver, (2) a choice of the ownership weight from the rank goal, and
+(3) a multi-GW elite EO forecast feeding (1). The full simulator / value-function route is parked.
+
 | # | Task | Brief | Status |
 |---|---|---|---|
-| 1 | **Tidy-up (one-off, do first).** (a) Merge PR #10 (design doc thresholds). (b) Commit everything in `handover/` to the same paths in the repo (data log, phase-1 design notes, three derived 2025-26 datasets, four `scripts/elite64/` scripts; the 2025-26 ones expect vaastav files under `ref/`, so add a short note at the top of each saying where those come from), then empty `handover/`. (c) Move every brief in `briefs/` except B04b and B07b to a new repo folder `docs/briefs/`. (d) Delete the inbox's old `datasets/` and `docs/` folders (all of it is now in the repo or in `handover/`; the one screenshot there is already transcribed). (e) Paste `handover/docs/how-we-work.md` into the repo `CLAUDE.md` as a "How we work" section (don't commit that file on its own). (f) **Switch to Claude Code only:** commit `handover/docs/pm/pm-handover.md` to `docs/pm/`; move this `TASKS.md` to `docs/tasks/TASKS.md` and the open briefs (B04b, B07b) to `docs/tasks/briefs/`; from then on you are PM as well as developer, per the new CLAUDE.md section, and this inbox folder is retired (leave a one-line README saying so). Also merge PR #11 if you're happy with it (see pm-handover). | (this row) | DONE (PRs #10, #11 merged; tidy-up PR #12) |
-| 2 | Points simulator: calibrate out of sample (tune 2023-24, test 2024-25, check 2025-26); fix haul frequency, premium players' means and blanks, defence correlation; minutes only from xMins; benchmark against a simple empirical model. | B07b | DONE (PR #11, merged; reduced scope, criteria not met - see note) |
-| 3 | Elite ownership forecast: refit and backtest on the full 2025-26 season. | B04b | TODO |
+| 1 | Tidy-up: merge PRs #10-#11, move the handover, briefs and this queue into the repo, retire the inbox | (none) | DONE (PR #12) |
+| 2 | Points simulator: out-of-sample calibration vs an empirical benchmark | B07b | DONE (PR #11; criteria not met, see note) |
+| 4 | **Ownership-weighted solver**: EV solve with xP adjusted by λ x EO; λ sweep with EV cost | S1 | TODO |
+| 5 | **λ from the rank goal**: normal approximation of the relative score; choose λ from gap, target rank, GWs left | S2 | TODO |
+| 3 | **Elite EO forecast**: refit on 2025-26 and forecast several GWs ahead | B04b | TODO |
 
-Tasks 2 and 3 are independent.
+Order: 4, 5, then 3 (row numbers are historical). 4 works with today's EO (collector or Elite 64);
+3 later improves its EO input.
 
-## Later (briefs not written yet)
+## Parked (revisit once the core works)
 
-4. Single-GW candidate generator + evaluator (MILP plans across ownership weights, scored by P(finish ≤ X)). Waits for 2 and 3.
-5. Value function V(gap, GWs left, chips). Waits for 4.
-6. Policy backtests on 2025-26. Waits for 5.
+- Event-engine simulator tuning (B07b follow-ups: haul frequency, defence correlation).
+- Value function V(gap, GWs left, chips) and policy backtests on 2025-26: a later check on S2's
+  normal approximation, not a prerequisite.
+- B03b leftovers: ranks 1/100k and a ~500-manager deeper sample for top-100/1k cut-offs.
 
 ## Done
 
@@ -53,3 +60,6 @@ B01, B01b, B02, B03 (PRs #1-4); B03b, B04, B05, B06, B07 (PRs #5-9); B05 follow-
   standings pages 200/2000 was not added, so top-100/1k cut-offs still have gaps.
 - Fixed while doing task 1: `fplrank.data.elite.available()` took `elite64_eo_calculated_2025-26.csv` for a
   dataset with season "calculated_2025-26" (6 tests failed); it now only accepts `<source>_eo_<YYYY-YY>.csv`.
+- 2026-10-06, stock take with Alex: simplified the plan to three core products (queue above); new briefs S1
+  and S2; B04b gains a multi-GW step. The collector now reads the AE64 (league 1291919) and E64 (league
+  38543) members each run (config `leagues`), so their EO is collected exactly from now on.

@@ -22,29 +22,25 @@ From now on Claude Code does both (see "How we work" in `CLAUDE.md`). This note 
 
 | Piece | State |
 |---|---|
-| Data: Elite 64 2025-26 (EO, captains, chips, FTs, full transfer lists, rebuilt ownership, calculated EO), 2026-27 GW1-5, collector (top 1000, twice weekly), projection loader, rank cut-offs | Done |
+| Data: Elite 64 2025-26 (EO, captains, chips, FTs, full transfer lists, rebuilt ownership, calculated EO), 2026-27 GW1-5, collector (top 1000 + AE64 + E64 leagues, twice weekly), projection loader, rank cut-offs | Done |
 | [B] field model v0 (`model/ownership.py`) | Built on 2026-27 GW1-5 only (4 transitions); beats persistence by ~20%. **B04b** (refit on full 2025-26) not started |
-| [A] simulator (`sim/scenarios.py`) | v0 merged. **B07b → PR #11, not merged**: tuned 2023-24, tested 2024-25. Event engine has the best log score but ordinary players haul too often (10+: 4.0% vs 2.9%); the empirical benchmark gets haul rates and premium means right. Report recommends the benchmark for haul-sensitive use for now |
-| [C]-[E] | Not started |
+| [A] simulator (`sim/scenarios.py`) | **Parked** (2026-10-06). B07b merged (PR #11): tuned 2023-24, tested 2024-25. Event engine has the best log score but ordinary players haul too often (10+: 4.0% vs 2.9%); the empirical benchmark gets haul rates and premium means right. Report recommends the benchmark for haul-sensitive use for now |
+| Solver with ownership weight (S1), λ from rank goal (S2) | Next; briefs in `docs/tasks/briefs/` |
 
-## Next, in order
+## Next, in order (revised at the 2026-10-06 stock take with Alex)
 
-1. Merge PR #10 (design doc thresholds) and review/merge PR #11.
-2. **Decide [A] for v1:** use the empirical benchmark as the default simulator (tails matter most for a
-   rank objective) and keep the event engine as research. Its biggest known fix is projected minutes
-   for old seasons (xP band × recent minutes). Record the choice as an ADR.
-3. **B04b:** refit and backtest the field model on all of 2025-26 (brief in `docs/tasks/briefs/`).
-   Must beat "next week = this week" overall and in double/blank/chip weeks.
-4. **Brief and build the single-GW solver ([C] + [D])**:
-   - Inputs: latest Solio projection (B02 registry), our squad/bank/FTs/chips (API snapshot), the
-     target group's forecast EO (B04), the simulator.
-   - Candidates: upstream MILP with objective xP + λ·EO·xP for λ on a grid (about −0.3 to 0.3), plus
-     captain alternatives, roll vs use FT, chip on/off. 20-60 candidates.
-   - Evaluate each: simulate Δ for the GW and report mean, spread, P(Δ ≥ g) for a few gaps g, and EV
-     cost vs the EV-best plan. No value function yet.
-   - Known-answer tests from solver-design §5b: copying the field gives Δ ≡ 0; λ = 0 equals the EV
-     solve; "haul then pile-in" keep/sell cases; captain switch point moves with the gap.
-5. Value function V by simulating season remainders; then policy backtests on 2025-26 (solver-design §5d).
+Alex wants a general solver he can give his current points/rank and target rank to, not a research
+platform. Simplest version first, then iterate:
+
+1. **S1, ownership-weighted solver:** the upstream EV solve on Solio projections with xP adjusted by
+   λ x EO (the "risk position" knob), a λ sweep, each plan's EV cost. No vendor changes.
+2. **S2, λ from the rank goal:** gap to the target-rank line + GWs left -> the λ that maximises
+   P(catching the line), using a normal approximation of the relative score (variance by xP band from
+   past seasons). No full simulation for v1.
+3. **B04b, elite EO forecast:** refit on 2025-26, forecast several GWs ahead, feed S1.
+
+Parked: the event simulator's tuning, the value function, policy backtests (later checks on S2, not
+prerequisites). See `docs/tasks/TASKS.md`.
 
 ## Data and findings worth remembering (details in `docs/data-log.md`)
 
@@ -61,11 +57,13 @@ From now on Claude Code does both (see "How we work" in `CLAUDE.md`). This note 
 - Solio projections: means only (`{gw}_xMins`, `{gw}_Pts`); paid, never committed.
 - Elite 64 Flows 2025-26 page (charts and per-GW EO tables): https://claude.ai/artifact/2EoksQZ4ZW1GPNsvXYJwNp
 
-## Open questions for Alex
+## Open questions for Alex (answered 2026-10-06)
 
-- Current overall rank, and whether the target is this season or next (sets X and urgency).
-- Who the Elite 64 managers are (team ids would let the collector track those groups directly).
-- Top 100 cut-offs: a source of past seasons' top-1000 entries.
+- Current rank: doesn't matter. Build a general solver where current points/rank and the target rank
+  are inputs and the risk weight follows from them.
+- Elite 64 team ids: found. AE64 = FPL league 1291919, E64 = FPL league 38543 (64 each, 4 in both);
+  the collector reads both leagues each run.
+- Still open: a source of past seasons' top-1000 entries for top-100 cut-offs (low priority).
 
 ## About Alex
 
