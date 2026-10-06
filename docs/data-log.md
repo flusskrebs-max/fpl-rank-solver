@@ -28,6 +28,16 @@ Claude Code (PM + developer) since 2026-10-06; earlier entries were written by t
 - Offset check of `ep_next` against vaastav `xP` (summed per player-GW) on the 11 GWs with both: the
   gw = N row matches GW N best (r 0.92-0.97, mean absolute gap 0.19-0.45 from GW2 on; gw = N-1 gives
   0.83-0.95). GW1 is the exception (r 0.40), so treat GW1 as unreliable. `xp_from_ep_next` uses gw = N.
+## 2026-10-06: Top-10k sample collected; EO now from the deadline XI
+
+- First run of the `top10k` set (every 10th of ranks 1-10,000, 1,000 managers, GW1-5): 56 min for all
+  2,022 managers, no failures.
+- Fix: EO used to be built from FPL's picks *after* automatic subs. Rebuilt from the deadline XI,
+  João Pedro GW5 is AE64 6.2% and E64 28.1%, matching the Solio graphic (6% / 28%); top 10k 60%.
+- Our GW5 top-10k EO against LiveFPL's top-10k page (667 players): correlation 0.98, mean absolute
+  gap 6 points over LiveFPL's top 40 (top1000 8, E64 9, AE64 17). LiveFPL runs a few points higher on
+  several players (Calafiori 85 vs 77, Rogers 64 vs 52, Raya 52 vs 42); likely a different population
+  (LiveFPL's top 10k at the GW5 deadline vs ours, today's top 10k) plus ±3 points sampling error.
 
 ## 2026-10-06: Data sources review
 

@@ -23,6 +23,10 @@ uv run python -m fplrank.collect.elite_picks report             # top-1000 vs El
 
 If a run is interrupted, run it again: it picks up from the saved snapshots.
 
+**Run time with the top-10k sample (C1, 2026-10-06):** the first run with `top10k` (about 900 new
+managers, GW1-5) took 56 minutes for 2,022 managers and about 6,500 requests. Later runs add the 200
+standings pages plus one GW of picks for each manager, roughly 10 extra minutes.
+
 ## Set up the schedule
 
 `scripts/collect_elite.cmd` runs the collector from the repo folder and appends to
