@@ -29,6 +29,7 @@ import contextlib
 import io
 import re
 import sys
+import time
 
 import pandas as pd
 
@@ -188,14 +189,20 @@ def plan_key(solution: dict) -> tuple:
     return xi, bench, cap, solution["buy"], solution["sell"], solution["chip"]
 
 
-def sweep(my_data, projections, eo, bootstrap, fixtures, lams=SWEEP, options=None, lam_gw=None) -> tuple[pd.DataFrame, dict]:
+def sweep(my_data, projections, eo, bootstrap, fixtures, lams=SWEEP, options=None, lam_gw=None, progress=None) -> tuple[pd.DataFrame, dict]:
     """Solve for each λ; returns one row per distinct plan (with the λ values giving it) and the solutions.
 
     Plans are the same if they do the same thing this GW (`plan_key`); a merged row shows the figures of
     its λ closest to 0. ev_cost is the EV given up against the λ = 0 plan (solved even if 0 is not in `lams`).
+    `progress(i, n, lam, secs)` is called after each solve.
     """
     lams = sorted(set(lams) | {0.0})
-    solutions = {lam: solve_with_ownership(my_data, projections, eo, lam, bootstrap, fixtures, options, lam_gw) for lam in lams}
+    solutions = {}
+    for i, lam in enumerate(lams, 1):
+        start = time.perf_counter()
+        solutions[lam] = solve_with_ownership(my_data, projections, eo, lam, bootstrap, fixtures, options, lam_gw)
+        if progress:
+            progress(i, len(lams), lam, time.perf_counter() - start)
     base_ev = solutions[0.0]["ev"]
     rows = {}
     for lam in sorted(lams, key=abs):
@@ -289,8 +296,16 @@ def _main(argv=None):
 
     lams = SWEEP if args.sweep or not args.lam else args.lam
     options = {"horizon": args.horizon, "secs": args.secs}
+    n = len(set(lams) | {0.0})
+    print(f"Solving {n} plans (one per λ); the table prints here when all are done.", flush=True)
+    console = sys.stdout
+
+    def progress(i, n, lam, secs):
+        print(f"  {i}/{n}: λ = {lam:g} solved in {secs:.0f}s", file=console, flush=True)
+
     with contextlib.redirect_stdout(io.StringIO()):  # upstream prints a lot per solve
-        table, solutions = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options, lam_gw)
+        table, solutions = sweep(my_data, projections, eo, bootstrap, fixtures, lams, options, lam_gw, progress)
+    print()
     with pd.option_context("display.width", 200, "display.max_colwidth", 60):
         print(table.to_string(index=False))
     if args.target_rank:
