@@ -1,6 +1,6 @@
 # B04b: Refit and backtest the field model on the full 2025-26 season
 
-Status: Ready · Size: two PRs (B04b-1 = steps 2-5, B04b-2 = step 6) · Release: v0.3 · Depends on: B04, B06, D1
+Status: Ready · Size: four PRs (B04b-1a = steps 2 and 4, B04b-1b = step 3 with its backtest by week type, B04b-1c = step 5, B04b-2 = step 6, which also feeds the R1 harness) · Release: v0.4 · Depends on: B04, B06, D1
 
 ## Why
 

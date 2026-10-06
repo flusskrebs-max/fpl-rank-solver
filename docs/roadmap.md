@@ -10,13 +10,18 @@ risk costs in expected points.
 ## Releases
 
 Each release is something Alex can run for a real deadline. Ship it, use it once, then improve.
+A release counts as shipped only when its "Ship" row in TASKS.md is done: a real-deadline run logged in
+`docs/tasks/log.md`.
 
 | Release | Alex can… | Tasks | Exit |
 |---|---|---|---|
-| **v0.1 Risk knob** | Run the EV solve with a λ knob and see plans across λ with their EV cost | S1, C0, C1, S1b, S1c, W1 | Used for one real GW deadline |
-| **v0.2 Pick λ for me** | Enter target rank + points; get λ, P(target) vs the EV plan, EV cost | S2a, D1, S2b, V1, S2c | Sensible λ across a grid of gaps and GWs left (S2 checks); used for one GW |
-| **v0.3 Better EO** | Use a forecast of how elite EO moves over the horizon | B04b-1, B04b-2 | Forecast beats persistence out of sample; S1 uses it |
-| **v0.4 Weekly report** | One command (or a schedule) produces the GW report | R1 | Used for 3 consecutive GWs |
+| **v0.1 Risk knob** | Run the EV solve with a λ knob and see plans across λ with their EV cost | S1, C0, C1, S1b, S1c, S1d, W1 | Logged real-deadline run |
+| **v0.2 Pick λ for me** | Enter target rank + points; get λ, P(target) vs the EV plan, EV cost | S2a, D1, S2b, V1, S2c | Sensible λ across a grid of gaps and GWs left (S2 checks); logged real-deadline run |
+| **v0.3 Weekly harness** | One command from current EO, projections, team, rank and rank goal to the GW report; a noise mode shows how stable the plan is | R1, R2 | Logged real-deadline run; then used for 3 consecutive GWs |
+| **v0.4 Better EO** | Use a forecast of how elite EO moves over the horizon, then see on 2025-26 when λ changes decisions | B04b-1a, B04b-1b, B04b-1c, B04b-2, RP1 | Forecast beats persistence out of sample; S1 and the harness use it; logged real-deadline run |
+
+The harness moved ahead of Better EO on 2026-10-06: R1 uses today's one-step EO, so it no longer waits for
+B04b-2, and Alex gets one command sooner.
 
 After v0.4: check S2's normal approximation against simulation and backtests (parked list in TASKS.md),
 and only build the value function if the check shows it changes decisions.

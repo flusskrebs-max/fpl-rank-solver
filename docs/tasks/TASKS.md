@@ -6,21 +6,23 @@ The plan and release order are in `docs/roadmap.md`; finished-task notes are in 
 **Rules for the queue**
 - One row = one PR, small enough to finish in a session. If it isn't, split it before starting.
 - Take the top row that isn't DONE. A row is DONE when its PR is merged and its "done when" is met.
-- When you finish or get stuck: set the status (`DONE (PR #n)`, `IN REVIEW (PR #n)`, `BLOCKED: why`),
-  add one dated line to `log.md`, move the brief to `docs/briefs/`.
-- A release ships when all its rows are DONE and Alex has used it once for a real GW. Note that in `log.md`.
+- When you finish or get stuck: set the status (`DONE (PR #n)`, `IN PROGRESS (PR #n)`, `IN REVIEW (PR #n)`,
+  `BLOCKED: why`), add one dated line to `log.md`, move the brief to `docs/briefs/`.
+- Each release ends with a **Ship** row: Alex runs it for a real GW deadline and `log.md` gets a line
+  (GW, λ chosen, what happened, anything to fix). The release ships when that row is DONE.
 
-## v0.1 Risk knob (ship for the next deadline)
+## v0.1 Risk knob
 
 | # | Task | Brief | Status |
 |---|---|---|---|
 | S1 | Ownership-weighted solver: xP·(1 + λ(EO − 1)), λ sweep with EV cost, CLI | S1 | DONE (PR #14) |
 | C0 | Collector: add rank 100,000 to `threshold_ranks` (one config line) | C0 | DONE (PR #16) |
-| C1 | Collector: sampled top-10k set (1 in 10 of ranks 1-10,000), so S1/S2 can use `--eo top10k` (moved from v0.3: this season's history can't be backfilled later; AE64 stays S1's default) | C1 | IN REVIEW (PR #22) |
-| S1b | Free fallback projections from FPL `ep_next`, so S1 runs without a Solio file (and in cloud tests); offline test on a saved real team | S1b | IN REVIEW (PR #23) |
-| S1c | EO at the deadline: `--eo-forecast` uses the B04 one-step forecast (`eo_mean`); by default λ applies to the first GW of the horizon only | S1c | TODO (Solio's EO is a broad-field forecast, so elite groups still need this) |
-| S1d | `--eo solio`: read EO from a Solio export; compare with collected AE64/top-1000/top-10k EO for the same GW (ADR 0004) | (none) | IN REVIEW (PR #23) |
-| W1 | `docs/weekly-run.md`: the pre-deadline steps on Alex's PC (download Solio, register, run S1) | (none) | IN REVIEW (PR #23) |
+| C1 | Collector: sampled top-10k set (1 in 10 of ranks 1-10,000), so S1/S2 can use `--eo top10k` | C1 | DONE (PR #22) |
+| S1b | Free fallback projections from FPL `ep_next`, so S1 runs without a Solio file (and in cloud tests) | S1b | DONE (PR #23) |
+| S1c | EO at the deadline: `--eo-forecast` uses the B04 one-step forecast; by default λ applies to the first GW only | S1c | DONE (PR #26) |
+| S1d | `--eo solio`: read EO from a Solio export; compare with collected AE64/top-1000/top-10k EO (ADR 0004) | (none) | DONE (PR #23) |
+| W1 | `docs/weekly-run.md`: the pre-deadline steps on Alex's PC (download Solio, register, run S1) | (none) | DONE (PR #23) |
+| Ship v0.1 | Logged real-deadline run with the λ sweep | (none) | TODO |
 
 ## v0.2 Pick λ for me
 
@@ -28,22 +30,29 @@ The plan and release order are in `docs/roadmap.md`; finished-task notes are in 
 |---|---|---|---|
 | S2a | Gap: T_X now + drift of the line against the EO group this season; `target_line` kept as the indicative absolute line (report only) | S2 | DONE (PR #17) |
 | D1 | Loader for FPL-Core-Insights `playerstats.csv` (2025-26, 2026-27): per-GW `ep_next`, ownership, transfers | D1 | DONE (PR #20) |
-| S2b | Variance table v(xP) by position × within-source xP quantile (not raw xP) from 2023-24, 2024-25 and 2025-26 (D1's `ep_next` as xP) | S2 | DONE (PR #21) |
-| V1 | Realised-spread check: per-GW realised Δ = Σ (m − EO) × pts for top-1000 and Elite 64 managers this season vs S2's σ for the same squads; within ~20% → s = 1, else set s to match. Also outputs drift and σ²_base | V1 | IN REVIEW (PR #25) |
-| S2c | `choose_lambda` + one-line report; CLI takes target rank and our points or rank | S2 | IN REVIEW (PR #24) |
+| S2b | Variance table v(xP) by position × within-source xP quantile from 2023-24, 2024-25 and 2025-26 | S2 | DONE (PR #21) |
+| V1 | Realised-spread check vs S2's σ for top-1000, top-10k and Elite 64 squads; sets s | V1 | DONE (PR #25): s = 1 |
+| S2c | `choose_lambda` + one-line report; CLI takes target rank and our points or rank | S2 | DONE (PR #24) |
+| Ship v0.2 | Logged real-deadline run with λ chosen from the rank goal | (none) | TODO |
 
-## v0.3 Better EO
-
-| # | Task | Brief | Status |
-|---|---|---|---|
-| B04b-1 | Refit the one-step EO model on 2025-26 with D1's `ep_next`; backtest vs persistence by week type | B04b | TODO |
-| B04b-2 | Multi-GW EO forecast (1/3/6 GWs ahead) and wire it into S1 (S1c already does one step) | B04b | TODO |
-
-## v0.4 Weekly report
+## v0.3 Weekly harness
 
 | # | Task | Brief | Status |
 |---|---|---|---|
-| R1 | One command: snapshot, solve, write `reports/GW{n}.md` (moves, λ, P(target), EV cost); optional scheduled run | R1 | TODO |
+| R1 | Unified harness, one command. Inputs: current EO, EV projections, current team, current rank, rank goal. "Optimum" mode: S1 sweep + S2 choice, writes `reports/GW{n}.md`. Uses today's one-step EO (no longer waits for B04b-2); loud warning when it falls back to `ep_next` | R1 | IN PROGRESS (PR #27) |
+| R2 | Noise/simulation mode in the harness: re-solve under sampled projection and EO noise and report how stable the recommended moves and λ are | (to write) | TODO |
+| Ship v0.3 | Logged real-deadline run from the harness | (none) | TODO |
+
+## v0.4 Better EO
+
+| # | Task | Brief | Status |
+|---|---|---|---|
+| B04b-1a | Refit the one-step EO model on 2025-26 with D1's `ep_next`; backtest vs persistence (GW10-38, AE64 and E64) | B04b | TODO |
+| B04b-1b | Add blank/double, banked-FT and chip-week covariates; backtest by week type | B04b | TODO |
+| B04b-1c | Captaincy: refit τ per group on 38 GWs of captain counts | B04b | TODO |
+| B04b-2 | Multi-GW EO forecast (1/3/6 GWs ahead), backtested vs persistence; wire into S1 and the harness | B04b | TODO |
+| RP1 | 2025-26 replay: run the harness week by week on last season and record when λ changes the decision (moves, captain) vs the EV plan | (to write) | TODO |
+| Ship v0.4 | Logged real-deadline run with the multi-GW EO | (none) | TODO |
 
 ## Parked (revisit once v0.4 is in use)
 

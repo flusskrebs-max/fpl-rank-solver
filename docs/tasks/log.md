@@ -72,6 +72,8 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, S2c: `fplrank.opt.rank_goal` + S1 CLI `--target-rank [--points]`. Live, rank-1 team's squad, top 10k, AE64,
   GW6, 33 GWs left: P 53% / 36% / 20% with 450 / 398 / 340 points; across λ P moves by at most ~1.3 points (season sd ~72
   dwarfs a 4-GW plan's effect), matching the review's "a few points, not tens" check. Ties go to λ near 0.
+- 2026-10-06, queue tidy: v0.1/v0.2 rows done (PRs #22-26); harness (R1, R2) moved ahead of Better EO as v0.3;
+  B04b split into 1a/1b/1c/2; 2025-26 replay (RP1) added; each release ends with a logged real-deadline "Ship" row.
 - 2026-10-06, V1: realised spread vs S2's sd on GW1-5: ratio 0.97-0.99 (top 1000, top 10k), 0.82-0.86 (AE64, E64),
   all within 20%, so s = 1. Report: `docs/research/realised-spread.md` (with drift by group).
 - 2026-10-06, S1c: `--eo-forecast` (B04 one-step forecast as deadline EO) and λ on the next GW only by default
