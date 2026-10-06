@@ -1,6 +1,6 @@
 # B04b: Refit and backtest the field model on the full 2025-26 season
 
-Status: Ready · Size: small-medium · Depends on: B04 (branch `b04-ownership-dynamics`), B06 (2025-26 data)
+Status: Ready · Size: two PRs (B04b-1 = steps 2-5, B04b-2 = step 6) · Release: v0.3 · Depends on: B04, B06, D1
 
 ## Why
 
@@ -13,10 +13,10 @@ ownership, transfer flows, captains and chips, including blanks, doubles and wil
 
 1. (Done: B04 is merged.)
 2. Refit `forecast_eo` on 2025-26, using `ownership_2025-26.csv` for squad ownership and the transfer
-   lists for flows. Projections for last season: vaastav `xP` only exists for 11 GWs of 2025-26, so
-   build a simple proxy for every GW (e.g. last-4-GW points per 90 × minutes share × fixture
-   difficulty, with 0 for blanks and ×2 for doubles), check it against xP on the 11 GWs, and say in
-   the report that it is a proxy.
+   lists for flows. Projections for last season: use D1's `xp_from_ep_next("2025-26")` (FPL's own xP,
+   roughly at the deadline) for every GW instead of a home-made proxy (changed 2026-10-06, see
+   `docs/research/data-sources.md`). D1 also gives overall `selected_by_percent` and transfer flow per GW:
+   try overall net transfers as one extra covariate and keep it only if it helps out of sample.
 3. Add the parts B04 couldn't test: fixtures (blank/double), banked FTs as a persistence modifier,
    chip weeks (WC GW6/32, FH GW13/34, BB GW33).
 4. Backtest GW10-38 against listed EO (out of sample by GW), against persistence, separately for
@@ -24,7 +24,8 @@ ownership, transfer flows, captains and chips, including blanks, doubles and wil
 5. Captaincy: refit τ per group on 38 GWs of captain counts.
 6. **Multi-GW** (added 2026-10-06): forecast EO for the next H GWs by applying the one-step model
    repeatedly with each GW's projections, so S1 can use a per-GW EO over its horizon. Backtest 1-, 3-
-   and 6-GW-ahead error against persistence.
+   and 6-GW-ahead error against persistence. Then pass the forecast into S1 (`--eo-forecast`) in place
+   of "this GW's EO repeated".
 7. From 2026-10-06 the collector also tracks AE64 and E64 directly (config `leagues`), so this
    season's elite EO is exact for every player; use it alongside the 2025-26 graphics data.
 

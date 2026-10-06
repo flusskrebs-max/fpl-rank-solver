@@ -1,4 +1,4 @@
-# PM handover (from Cowork, 2026-10-06)
+# PM context (handed over from Cowork, 2026-10-06)
 
 Until now planning ran in a Cowork project and building in Claude Code, linked by an inbox folder.
 From now on Claude Code does both (see "How we work" in `CLAUDE.md`). This note is the PM context.
@@ -18,29 +18,10 @@ From now on Claude Code does both (see "How we work" in `CLAUDE.md`). This note 
 - Historical first: build from what we've assembled (2025-26 Elite 64 season, vaastav seasons,
   collector data) rather than waiting a season.
 
-## Where things stand
+## Status and next steps
 
-| Piece | State |
-|---|---|
-| Data: Elite 64 2025-26 (EO, captains, chips, FTs, full transfer lists, rebuilt ownership, calculated EO), 2026-27 GW1-5, collector (top 1000 + AE64 + E64 leagues, twice weekly), projection loader, rank cut-offs | Done |
-| [B] field model v0 (`model/ownership.py`) | Built on 2026-27 GW1-5 only (4 transitions); beats persistence by ~20%. **B04b** (refit on full 2025-26) not started |
-| [A] simulator (`sim/scenarios.py`) | **Parked** (2026-10-06). B07b merged (PR #11): tuned 2023-24, tested 2024-25. Event engine has the best log score but ordinary players haul too often (10+: 4.0% vs 2.9%); the empirical benchmark gets haul rates and premium means right. Report recommends the benchmark for haul-sensitive use for now |
-| Solver with ownership weight (S1), λ from rank goal (S2) | Next; briefs in `docs/tasks/briefs/` |
-
-## Next, in order (revised at the 2026-10-06 stock take with Alex)
-
-Alex wants a general solver he can give his current points/rank and target rank to, not a research
-platform. Simplest version first, then iterate:
-
-1. **S1, ownership-weighted solver:** the upstream EV solve on Solio projections with xP adjusted by
-   λ x EO (the "risk position" knob), a λ sweep, each plan's EV cost. No vendor changes.
-2. **S2, λ from the rank goal:** gap to the target-rank line + GWs left -> the λ that maximises
-   P(catching the line), using a normal approximation of the relative score (variance by xP band from
-   past seasons). No full simulation for v1.
-3. **B04b, elite EO forecast:** refit on 2025-26, forecast several GWs ahead, feed S1.
-
-Parked: the event simulator's tuning, the value function, policy backtests (later checks on S2, not
-prerequisites). See `docs/tasks/TASKS.md`.
+See `docs/roadmap.md` (releases) and `docs/tasks/TASKS.md` (the queue); they replace the status
+tables that used to be here.
 
 ## Data and findings worth remembering (details in `docs/data-log.md`)
 

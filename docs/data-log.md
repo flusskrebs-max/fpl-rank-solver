@@ -3,6 +3,25 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-06: Data sources review
+
+- vaastav has stopped weekly updates; its 2025-26 `xP` is filled only for GWs 1-6, 8, 9, 24, 29 and 38.
+- FPL-Core-Insights `playerstats.csv` has FPL's `ep_next` for every 2025-26 GW (and 2026-27 so far);
+  it tracks vaastav `xP` closely (correlation 0.92-0.97, mean absolute difference 0.2-0.45 points on
+  the GWs where both exist). Basis for D1, S1b, S2b and B04b. Details: `docs/research/data-sources.md`.
+- FBref lost its Opta xG on 2026-01-20; not a source for us.
+
+## 2026-10-06: Elite 64 collected directly (2026-27 GW1-5)
+
+- The collector now reads AE64 (FPL league 1291919) and E64 (league 38543) each run: 64 managers
+  each, 4 in both. First run: all 128 managers, GW1-5, no failures (`data/collected/`, sets AE64/E64).
+- Check against the transcribed graphics (360 listed player-GWs): mean absolute EO gap 0.5 / 0.7
+  percentage points (AE64 / E64), correlation 1.00 / 0.998. So the graphics transcription is good and
+  the collected EO can replace it from now on.
+- Three rows disagree and look like transcription or id slips in `elite64_eo_2026-27.csv`: O'Reilly GW3
+  (11% in both groups vs 0 collected), João Pedro GW5 E64 (28% vs 0), Kinsky GW1 E64 (64% vs 52%).
+  Worth fixing when B04b uses the data.
+
 ## 2026-10-05: Elite 64 2025-26, full season transcribed
 
 - Source: Alex's folder of Solio graphics (`Downloads\Ae64E64 data 2025`). Transcribed all of it:
