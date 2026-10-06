@@ -5,7 +5,11 @@ field's growth is counted twice: once in the line, once in μ = Σ (m - EO) x xP
 
     G = T_X(now) - ours(now) + drift x GWs left
 
-`line_drift(rank, group)`: the mean over this season's GWs of (the line's GW gain - the group's mean GW
+`season_drift(rank, group)` (what S2c uses): drift = the mean over full past seasons of (the line's final
+points - the group's mean final points) / 38, and its season-to-season sd, which x GWs left is the gap's
+spread. A lower bound, as today's members' past seasons run high (docs/research/rank-goal-inputs.md).
+
+`line_drift(rank, group)` (this season, for the report): the mean over this season's GWs of (the line's GW gain - the group's mean GW
 points), with the line at each past GW interpolated from the collected managers' overall ranks and totals.
 0 until 3 GWs are available. Caveat: groups are today's members, so for top1000 (selected for scoring
 well so far) the group's past points run high and drift reads low; the fixed Elite 64 lists are less
@@ -19,7 +23,8 @@ with T_X(now) from the collector's `thresholds` table (log-rank interpolation, n
 pace_X the line's average points per GW over recent seasons (end-of-season cut-off / 38, from the `past`
 field; docs/research/rank-cutoffs.md). The line's current pace is not used: early in a season the
 managers at rank X are partly there by luck (top 10k ran at 80 a GW to GW5 of 2026-27 vs 63-68
-historically). `sd` is the spread of the seasons' paces scaled to the GWs left; S2c adds sd² to σ².
+historically). `sd` is the spread of the seasons' paces scaled to the GWs left (the absolute line's, so S2c does not use it:
+the group's own swings would count twice).
 """
 
 import math
@@ -151,6 +156,51 @@ def line_drift(
     return drift, table
 
 
+@dataclass(frozen=True)
+class SeasonDrift:
+    rank: int
+    group: str
+    drift: float  # mean per GW of (line's final points - group's mean final points) / 38
+    sd: float  # spread of that per-GW figure across seasons; x GWs left = the relative line's sd
+    seasons: tuple[str, ...]
+
+    def __str__(self):
+        return (
+            f"drift vs {self.group} {self.drift:+.1f} ± {self.sd:.2f} a GW "
+            f"({self.seasons[0]}..{self.seasons[-1]}, {len(self.seasons)} seasons)"
+        )
+
+
+def season_drift(
+    rank: int, group: str, past: pd.DataFrame | None = None, members: pd.DataFrame | None = None, since: str = "2018-19"
+) -> SeasonDrift:
+    """The line's drift against the EO group over full past seasons, and its season-to-season spread.
+
+    Per season: (end-of-season line - the group's mean final total) / 38, with the group = today's members
+    and their `past` totals. Both are taken against the group, so the spread is of the gap, not of the line
+    (a high-scoring season lifts both). Biased low: today's members were chosen on past results, so their
+    past seasons run high and the drift is a lower bound (docs/research/rank-goal-inputs.md).
+    `elite` is the weighted mean of its groups (`opt.ownership.group_weights`), as its EO is.
+    """
+    from fplrank.collect.elite_picks import season_cutoffs
+    from fplrank.opt.ownership import group_weights
+
+    if past is None:
+        past = pd.read_parquet(COLLECTED_DIR / "past_seasons.parquet")
+    if members is None:
+        members = pd.read_parquet(COLLECTED_DIR / "members.parquet")
+    past = past[past["season"] >= since]
+    line = season_cutoffs(past, ranks=(rank,)).set_index("season")["points"]
+    group_mean = sum(
+        w * past[past["entry_id"].isin(set(members.loc[members["set"] == g, "entry_id"]))].groupby("season")["total_points"].mean()
+        for g, w in group_weights(group).items()
+    )
+    per_gw = ((line - group_mean) / N_GWS).dropna().sort_index()
+    if len(per_gw) < 2:
+        raise ValueError(f"Need 2+ seasons with a top-{rank:,} line and {group} totals since {since}")
+    return SeasonDrift(rank, group, float(per_gw.mean()), float(per_gw.std(ddof=1)), tuple(per_gw.index))
+
+
 def _main(argv=None):
     import argparse
 
@@ -163,7 +213,8 @@ def _main(argv=None):
     for rank in args.ranks:
         print(target_line(rank, args.gw))
         drift, table = line_drift(rank, args.group)
-        print(f"  drift vs {args.group}: {drift:+.1f} a GW over GWs {', '.join(map(str, table.index))}")
+        print(f"  this season's drift vs {args.group}: {drift:+.1f} a GW over GWs {', '.join(map(str, table.index))}")
+        print(f"  full seasons (used by --target): {season_drift(rank, args.group)}")
 
 
 if __name__ == "__main__":

@@ -175,14 +175,14 @@ def test_rank_goal_table_moves_a_stale_line_on_by_its_pace(monkeypatch):
     from fplrank.rank import target
 
     monkeypatch.setattr(target, "target_line", lambda rank: target.TargetLine(rank, 3, 200, 60, 200 + 35 * 60, float("nan"), ("x",)))
-    monkeypatch.setattr(target, "line_drift", lambda rank, group: (0.0, None))
+    monkeypatch.setattr(target, "season_drift", lambda rank, group: target.SeasonDrift(rank, group, 0.0, 0.25, ("a", "b")))
     monkeypatch.setattr(variance, "build", lambda: None)
     monkeypatch.setattr(rank_goal, "plan_moments", lambda *a, **k: rank_goal.Moments(0.0, 100.0, 1))
     solutions = {0.0: {"ev": 50.0}, 0.1: {"ev": 49.0}}
     table, text = ow.rank_goal_table(solutions, None, None, 6, 10000, 300, "AE64")
     assert "line 320 after GW5 (GW3 line moved on 2 GW at 60 a GW)" in text
-    assert "gap to close 20" in text
-    assert table["p"].notna().all()  # one season of cut-offs (sd NaN) still gives a probability
+    assert "gap to close 20 ± 8 over 33 GWs (κ = 0.75" in text  # sd 0.25 a GW x 33, the default κ
+    assert table["p"].notna().all()
 
 
 def test_repick_eo_mixes_the_elite_groups_on_next_gw_xp(tmp_path):

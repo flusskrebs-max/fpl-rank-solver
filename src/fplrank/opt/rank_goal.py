@@ -5,15 +5,17 @@ Brief S2 (revised after the critical review, 2026-10-06). Our score relative to 
     per GW, μ = κ x Σ (m - EO) x xP - hits,   var = s² x Σ (m - EO)² x v(xP)
 
 m = our multiplier (0 bench, 1, 2 captain, 3 TC), EO the group's, v(xP) from `model.variance`. κ (default
-0.3) shrinks our projected edge over the field, since projections are noisy and the field sees them too;
-s (default 1) scales sd until V1 calibrates it. Covariance between players is ignored.
+0.75, `--kappa`) shrinks our projected edge over the field: real managers' edges come through at about 1:1,
+less a margin for the solver picking exactly where the projections disagree with the field
+(docs/research/rank-goal-inputs.md). s (default 1) scales sd (V1). Covariance between players is ignored.
 
 Season: the plan covers H GWs; the remaining GWs left - H are assumed to go like the λ = 0 plan's average
 GW (a plan for this week is not repeated for the season). The gap to close is relative to the group:
 
-    G = T_X(now) - ours(now) + drift x GWs left       (drift: `rank.target.line_drift`)
+    G = T_X(now) - ours(now) + drift x GWs left
 
-and P = Φ((μ_tot - G) / sqrt(var_tot + sd_line²)), sd_line from `rank.target.target_line`.
+and P = Φ((μ_tot - G) / sqrt(var_tot + sd_line²)). drift and sd_line (its season-to-season sd x GWs left)
+are the line against the group over full past seasons (`rank.target.season_drift`); drift is a lower bound.
 """
 
 import math
@@ -24,7 +26,7 @@ import pandas as pd
 from fplrank.model import variance
 from fplrank.opt.ownership import _raw_xp, eo_for
 
-KAPPA = 0.3
+KAPPA = 0.75
 
 
 @dataclass(frozen=True)

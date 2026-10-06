@@ -23,7 +23,9 @@ move together in the same week but their gaps persist (keep groups separate).
 variance from v(xP) by position and projection band ([variance-table.md](variance-table.md)), checked against the
 realised spread of real managers' scores (ratio 0.82-0.99, so s = 1; [realised-spread.md](realised-spread.md)).
 The gap uses the line now plus its drift against the EO group ([rank-cutoffs.md](rank-cutoffs.md) for end-of-season
-lines).
+lines). Drift and the line's spread are measured against the group over full seasons 2018-26 (top 10k: +1.2 a GW,
+±11 over 33 GWs vs E64, ±42 vs AE64; the drift is a lower bound), and κ = 0.75: real managers' projected edges
+come through at about 1:1 ([rank-goal-inputs.md](rank-goal-inputs.md)).
 
 ## Index
 
@@ -38,5 +40,6 @@ lines).
 | [top1000-vs-elite64.md](top1000-vs-elite64.md) | Collector EO against the Elite 64 graphics |
 | [variance-table.md](variance-table.md) | v(xP) by position and projection band (S2b) |
 | [realised-spread.md](realised-spread.md) | S2's predicted sd against real managers' spread (V1) |
+| [rank-goal-inputs.md](rank-goal-inputs.md) | Line spread and drift against the group, and κ, for P(target) |
 | [rank-cutoffs.md](rank-cutoffs.md) | End-of-season points for top 100 / 1k / 10k / 100k |
 | [archive/](archive/) | Superseded: EO projector proposal, EO flow model (failed), EO dynamics v0, scenario engine calibration, phase 1 notes |

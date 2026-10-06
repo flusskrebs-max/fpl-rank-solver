@@ -113,3 +113,7 @@ One line per finished task or decision from now on; detail belongs in the PR and
   each manager's chip-free latest squad on his next-GW xP, with the AE64/E64 armband herded onto the consensus
   captain (managers who don't own him buy him). GW2-5 EO error: AE64 7.3 (herding neutral), E64 5.8 to 5.2;
   persistence was 11.6 / 8.5. Falls back to the repeated chip-free EO without picks or xP. `eo-blend.md` updated.
+- 2026-10-06, RG1: `fplrank solve --target` takes the line's drift and spread against the EO group over full
+  seasons 2018-26 (`rank.target.season_drift`; top 10k +1.2 a GW, ±11 over 33 GWs vs E64, ±42 vs AE64) instead
+  of this season's GW2-5 drift (+4.2 / +2.5) and the absolute line's ±95, which counted the group's swings twice.
+  κ 0.3 to 0.75 (data say about 1), `--kappa` overrides. Evidence: `docs/research/rank-goal-inputs.md`.

@@ -60,6 +60,8 @@ Type your real team id in place of `<your team id>` (PowerShell rejects the `<`)
   GW's chips taken out) or `solio` (Solio's forecast).
 - `--target 10000` solves once per λ from −0.3 to 0.3 and picks the λ with the best P(finishing in the
   top 10,000). Your points come from the FPL API, or give `--points`. Use `--lam 0.1` instead to fix λ.
+  `--kappa 0.5` changes how much of your projected edge over the field counts (default 0.75;
+  `docs/research/rank-goal-inputs.md`).
 - `--sims 50` then runs his simulations 50 times at the chosen λ (his noise on the projections) and
   prints his summary of how often each move comes up. Leave it out for a quick run.
 - Any of his flags work as usual: `--horizon 5`, `--use_wc "[8]"`, `--banned "[...]"`, and so on.

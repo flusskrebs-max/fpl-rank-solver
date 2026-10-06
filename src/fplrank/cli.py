@@ -145,6 +145,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--target", type=int, help="target overall rank: choose the λ with the best P(finishing at or above it)")
     p.add_argument("--lam", type=float, help="fix λ instead of choosing it (0 = his EV plan)")
     p.add_argument("--points", type=int, help="our total points now, for --target (default: from the FPL API)")
+    p.add_argument("--kappa", type=float, help="share of our projected edge over the field that counts, for --target (default 0.75)")
     p.add_argument("--sims", type=int, help="then run his simulations N times at the chosen λ and print his summary")
     return p
 
@@ -189,7 +190,7 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
                 p.error("--target needs --points or his --team_id")
             points = (standing or ownership.current_standing)(int(team_id))[0]
         table, gap_text = ownership.rank_goal_table(
-            solutions, base.projections, eo, gw, ours.target, points, ownership.drift_group(group), hit_cost=hit_cost
+            solutions, base.projections, eo, gw, ours.target, points, ownership.drift_group(group), ours.kappa, hit_cost
         )
         if ours.lam is not None:  # fixed λ: report it, not the best one
             table = pd.concat([table[table["lam"] == ours.lam], table[table["lam"] != ours.lam]], ignore_index=True)
@@ -198,7 +199,7 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
         print("P by λ: " + ", ".join(f"{r.lam:g} {r.p:.0%}" for r in table.sort_values("lam").itertuples()))
         from fplrank.opt import rank_goal
 
-        print(rank_goal.report(table, ours.target))
+        print(rank_goal.report(table, ours.target, rank_goal.KAPPA if ours.kappa is None else ours.kappa))
     else:
         chosen = ours.lam
         cost = solutions[0.0]["ev"] - solutions[chosen]["ev"]
@@ -215,7 +216,7 @@ def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     sys.stdout.reconfigure(encoding="utf-8")  # player names and λ on the Windows console
     if not argv or argv[0] != "solve":
-        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--sims N]")
+        print("usage: fplrank solve [his solve.py flags] [--eo GROUP] [--target RANK] [--lam λ] [--points N] [--kappa κ] [--sims N]")
         return 2
     return solve(argv[1:])
 
