@@ -1,7 +1,8 @@
 # Weekly run (before each deadline)
 
 What to do on your PC each GW, in PowerShell from the repo folder (`cd C:\Users\Alex\Documents\fpl-rank-solver`).
-About ten minutes, most of it waiting for solves. Nothing here needs git.
+There is one command, `uv run fplrank solve`. It is Sertalp's `solve.py` (his settings files and every
+one of his flags work unchanged) plus our two extras: the field's EO and the choice of λ.
 
 ## 1. Get the latest code (once a week)
 
@@ -13,69 +14,68 @@ uv sync --group dev
 
 `git pull` downloads whatever has been merged on GitHub since last week.
 
-## 2. Download and register this GW's Solio files
+## 2. Put this GW's Solio files in place
 
-On Solio, export the **projections** (`projection (N).csv`) and the **effective ownership** file
-(`solio_effective_ownership.csv`) to Downloads. Then:
+On Solio, export the **projections** and the **effective ownership** file to Downloads. Then:
 
 ```powershell
-uv run python -m fplrank.data.projections register "$HOME\Downloads\projection (9).csv"
+Copy-Item "$HOME\Downloads\projection (9).csv" "vendor\open-fpl-solver\data\solio.csv"
 Copy-Item "$HOME\Downloads\solio_effective_ownership.csv" "data\projections\solio_eo\EO_GW07_$(Get-Date -Format yyyyMMdd).csv"
 ```
 
-Change `(9)` and `GW07` to match. Both end up under `data\`, which git ignores, so paid data is
-never uploaded. `register` prints the GWs the file covers; check it starts at the coming GW.
+Change `(9)` and `GW07` to match. `solio.csv` is the file his solver reads (his `datasource` is
+`solio`). Both locations are git-ignored, so paid data is never uploaded. The EO file is only needed
+for `--eo solio`.
 
-## 3. Run the solver
+## 3. Load your team
 
-The quickest way is the weekly report, which runs everything below and writes `reports\GW{n}.md`:
+Before you have made any transfers this GW, his solver reads your team from the FPL API: pass
+`--team_id <your team id>`.
+
+If you have already made transfers, or prices have moved since, use his bookmarklet instead. Set it
+up once by following `vendor\open-fpl-solver\data\getting_team_json.md`: a bookmark whose address is a
+short `javascript:` snippet. Then each week:
+
+1. Log in to fantasy.premierleague.com and click the bookmark. Your team is copied to the clipboard.
+2. Save it as his team file:
+
+   ```powershell
+   [IO.File]::WriteAllText("$PWD\vendor\open-fpl-solver\data\team.json", (Get-Clipboard -Raw))
+   ```
+
+   This writes the file without a byte-order mark, which his solver needs. `team.json` is git-ignored.
+
+3. Add `--team_data json` to the command below (keep `--team_id` so your points can be looked up).
+
+## 4. Run the solver
 
 ```powershell
-uv run python -m fplrank.weekly --team <your team id> --target 10000
+uv run fplrank solve --team_id <your team id> --eo AE64 --target 10000 --sims 50
 ```
 
-It uses `--eo AE64` (last GW's collected EO) unless you add `--eo-forecast` (the model's guess at the deadline EO)
-or `--eo solio`. Your points and rank come from the FPL API; `--points`/`--rank` override them. The report gives the recommended
-moves, captain and XI, P(top 10,000) against the EV plan, the EV cost, two alternatives and the full
-sweep. If it starts with a WARNING about `ep_next`, step 2 was missed: don't use that plan.
-
-To run the steps by hand instead:
-
-```powershell
-uv run python -m fplrank.opt.ownership --team <your team id> --eo AE64 --sweep
-```
+Type your real team id in place of `<your team id>` (PowerShell rejects the `<`).
 
 - `--eo` picks whose ownership to weigh against: `AE64`, `E64`, `top1000`, `top10k` (collector, last
-  GW's EO repeated) or `solio` (Solio's forecast, a different EO each GW).
-- `--sweep` tries λ from −0.3 to 0.3; use `--lam 0 0.1` for just a few values. λ > 0 covers what the
-  field owns, λ < 0 chases differentials.
-- `--horizon` (default 5) and `--secs` (default 600 per solve) as in the upstream solver.
+  GW's EO) or `solio` (Solio's forecast).
+- `--target 10000` solves once per λ from −0.3 to 0.3 and picks the λ with the best P(finishing in the
+  top 10,000). Your points come from the FPL API, or give `--points`. Use `--lam 0.1` instead to fix λ.
+- `--sims 50` then runs his simulations 50 times at the chosen λ (his noise on the projections) and
+  prints his summary of how often each move comes up. Leave it out for a quick run.
+- Any of his flags work as usual: `--horizon 5`, `--use_wc "[8]"`, `--banned "[...]"`, and so on.
+  With no `--eo`, `--target` or `--lam` it is exactly his solver.
 
-While it runs it prints one line per λ as each solve finishes (`3/9: λ = -0.1 solved in 25s`); the
-table appears in the same window at the end.
+It prints one line per λ as each solve finishes, then the EO used, the gap to the target line, P by λ,
+and his normal output for the chosen plan.
 
-Output: one row per distinct plan, with the λ values that give it, captain, transfers, chip, EV over
-the horizon, EV this GW, EV cost against λ = 0, EO held and exposure (how far the XI is from the field).
+## 5. Read the plan and decide
 
-To have it choose λ for a rank goal, add `--target-rank 10000` (your points are read from FPL, or
-give `--points`). It prints P(finishing at or above the line) for each λ and the best one. Early in
-the season the differences are small, because one week's plan matters little over 30+ GWs.
-
-## 4. Read the plan and decide
-
-Start from the λ = 0 row (pure EV). A row with a small EV cost and a big drop in exposure is cheap
-cover; a large EV cost needs a reason (a big lead to protect, or a big gap to close). Until S2 lands,
-choosing λ is your call.
-
-## 5. Afterwards
-
-Tell Claude in the project which λ you used and anything odd in the output; it goes in
-`docs/tasks/log.md` and feeds the next fix. The collector runs itself on Tuesday and Friday at 20:00
-(`docs/collect-schedule.md`).
+P by λ shows how much the choice matters: early in the season the differences are small, because one
+week's plan matters little over 30+ GWs. The simulations summary shows which moves are robust to
+noise. Tell Claude in the project which plan you used and anything odd; it goes in
+`docs/tasks/log.md`. The collector runs itself on Tuesday and Friday at 20:00 (`docs/collect-schedule.md`).
 
 ## If something goes wrong
 
-- "No Solio file registered for this GW": step 2 was missed, or the file starts at an earlier GW. The
-  solver falls back to FPL's `ep_next`, which is a form measure, not a projection, so don't use that plan.
 - "No EO for group": the collector hasn't run since the group was added; use `--eo AE64` or `--eo solio`.
-- A solve takes much longer than a minute or two: lower `--horizon`.
+- His solver can't find `solio.csv`: step 2 was missed or the file was saved under another name.
+- A solve takes much longer than a minute or two: lower `--horizon`, or leave out `--sims`.
