@@ -61,3 +61,9 @@ def test_line_drift_against_group():
     assert list(table["group_points"]) == [66, 50, 60]  # net of the GW2 hit
     assert drift == pytest.approx(((63 - 66) + (60 - 50) + (55 - 60)) / 3)
     assert tg.line_drift(10_000, "H", ranks, members, min_gws=4)[0] == 0.0
+
+
+def test_line_drift_against_elite_mix():
+    ranks, members = _ranks(), pd.DataFrame({"set": ["AE64", "E64"], "entry_id": [1, 2]})
+    _, table = tg.line_drift(10_000, "elite", ranks, members)
+    assert list(table["group_points"]) == pytest.approx([(60 + 66) / 2, (70 + 50) / 2, (50 + 60) / 2])

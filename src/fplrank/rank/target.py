@@ -131,15 +131,20 @@ def line_drift(
     """Mean per-GW (line gain - group's mean net GW points) this season, and the per-GW table behind it.
 
     Net points = points - transfer cost. Returns 0 if fewer than `min_gws` GWs have both numbers.
+    `elite` is measured against the weighted mean of its groups (`opt.ownership.group_weights`), as its EO is.
     """
+    from fplrank.opt.ownership import group_weights
+
     if ranks is None:
         ranks = pd.read_parquet(COLLECTED_DIR / "ranks.parquet")
     if members is None:
         members = pd.read_parquet(COLLECTED_DIR / "members.parquet")
     line = line_history(ranks, rank)
-    ids = set(members.loc[members["set"] == group, "entry_id"])
-    g = ranks[ranks["entry_id"].isin(ids)]
-    group_pts = (g["points"] - g["event_transfers_cost"]).groupby(g["gw"]).mean()
+    net = ranks["points"] - ranks["event_transfers_cost"]
+    group_pts = sum(
+        w * net[ranks["entry_id"].isin(set(members.loc[members["set"] == g, "entry_id"]))].groupby(ranks["gw"]).mean()
+        for g, w in group_weights(group).items()
+    )
     table = pd.DataFrame({"line": line, "line_gain": line.diff(), "group_points": group_pts}).dropna()
     table["drift"] = table["line_gain"] - table["group_points"]
     drift = float(table["drift"].mean()) if len(table) >= min_gws else 0.0
@@ -152,7 +157,7 @@ def _main(argv=None):
     p = argparse.ArgumentParser(description="Points needed for a target overall rank, now and at GW38")
     p.add_argument("ranks", type=int, nargs="+")
     p.add_argument("--gw", type=int, help="GW of the line (default: latest collected)")
-    p.add_argument("--group", default="AE64", help="EO group for the drift (AE64, E64, top1000)")
+    p.add_argument("--group", default="AE64", help="EO group for the drift (AE64, E64, elite, top1000)")
     args = p.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     for rank in args.ranks:
