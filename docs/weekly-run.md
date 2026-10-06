@@ -51,6 +51,9 @@ uv run python -m fplrank.opt.ownership --team <your team id> --eo AE64 --sweep
   field owns, λ < 0 chases differentials.
 - `--horizon` (default 5) and `--secs` (default 600 per solve) as in the upstream solver.
 
+While it runs it prints one line per λ as each solve finishes (`3/9: λ = -0.1 solved in 25s`); the
+table appears in the same window at the end.
+
 Output: one row per distinct plan, with the λ values that give it, captain, transfers, chip, EV over
 the horizon, EV this GW, EV cost against λ = 0, EO held and exposure (how far the XI is from the field).
 
