@@ -54,3 +54,4 @@ One line per finished task or decision from now on; detail belongs in the PR and
   vs top1000 -10.0 (biased: today's top 1000 were selected for scoring well). `target_line(rank)` (report only):
   line now + GWs left x past seasons' pace; after GW5 top 10k 398 now, ~2589 ± 95 at GW38.
 - 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
+- 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
