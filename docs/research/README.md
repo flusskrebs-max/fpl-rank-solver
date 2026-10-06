@@ -40,6 +40,7 @@ come through at about 1:1 ([rank-goal-inputs.md](rank-goal-inputs.md)).
 | [top1000-vs-elite64.md](top1000-vs-elite64.md) | Collector EO against the Elite 64 graphics |
 | [variance-table.md](variance-table.md) | v(xP) by position and projection band (S2b) |
 | [realised-spread.md](realised-spread.md) | S2's predicted sd against real managers' spread (V1) |
+| [eo-horizon.md](eo-horizon.md) | λ on later GWs: `--eo_decay`, per-GW re-picked EO, d = 0 / 0.7 / 1 on a real team |
 | [rank-goal-inputs.md](rank-goal-inputs.md) | Line spread and drift against the group, and κ, for P(target) |
 | [rank-cutoffs.md](rank-cutoffs.md) | End-of-season points for top 100 / 1k / 10k / 100k |
 | [archive/](archive/) | Superseded: EO projector proposal, EO flow model (failed), EO dynamics v0, scenario engine calibration, phase 1 notes |
