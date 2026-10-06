@@ -74,6 +74,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   CLI `uv run python -m fplrank.opt.ownership --team <id> --eo AE64|E64|top1000 --sweep` (live API).
 - `src/fplrank/rank/target.py`: S2a. `line_drift(rank, group)` (the gap's drift against the EO group) and
   `target_line(rank)` (indicative absolute line for the report); `uv run python -m fplrank.rank.target 10000`.
+- `src/fplrank/opt/rank_goal.py`: S2c. `plan_moments`, `choose_lambda` (P of reaching the target line per λ);
+  CLI: add `--target-rank 10000 [--points N]` to the S1 command. `src/fplrank/model/variance.py`: S2b v(xP) table.
 - `src/fplrank/opt/toy.py`: spike showing the SAA probability objective in HiGHS.
 - `vendor/open-fpl-solver/`: upstream, pinned. **Never edit**; update with `scripts/update_upstream.sh`.
 - `docs/roadmap.md` (releases and the weekly loop), `docs/research/` (thinking; `data-sources.md` = which

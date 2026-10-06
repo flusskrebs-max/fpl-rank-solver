@@ -69,3 +69,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   LiveFPL `/EO` (all players, top 10k + overall, current GW) is the manual cross-check; no history or per-manager data.
 - 2026-10-06, D1: `fplrank.data.core_insights` (playerstats loader, `xp_from_ep_next` with gw = N, checked vs vaastav).
 - 2026-10-06, S2b: `fplrank.model.variance` (v by position x within-source xP decile; table in `docs/research/variance-table.md`).
+- 2026-10-06, S2c: `fplrank.opt.rank_goal` + S1 CLI `--target-rank [--points]`. Live, rank-1 team's squad, top 10k, AE64,
+  GW6, 33 GWs left: P 53% / 36% / 20% with 450 / 398 / 340 points; across λ P moves by at most ~1.3 points (season sd ~72
+  dwarfs a 4-GW plan's effect), matching the review's "a few points, not tens" check. Ties go to λ near 0.
