@@ -48,3 +48,4 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-06, critical review of the S2 plan (triaged in another thread): gap now uses the line's drift against the EO group
   (no double-counted field growth); μ shrunk by κ = 0.3; season total = plan horizon + λ = 0 base; new V1 (realised spread) and
   S1c (EO at the deadline); C1 moved to v0.1; S2b bands by xP quantile; S1 docstring: centring at EO = 1 is a scale choice.
+- 2026-10-06, C0: collector records the top-100k line too (page 2000, one extra request per run). Live check: 377 points after GW5.

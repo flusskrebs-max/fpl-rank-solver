@@ -1,3 +1,4 @@
+import json
 import math
 from datetime import UTC, datetime, timedelta
 
@@ -168,3 +169,14 @@ def test_season_cutoffs_interpolates_in_log_rank_and_never_extrapolates():
     assert cut.loc[5_000, "points"] == 2500  # exact hit
     assert cut.loc[1_000, "points"] == pytest.approx(2700 - 200 * math.log(2) / math.log(10))
     assert (cut.loc[10_000, "below_rank"], cut.loc[10_000, "above_rank"]) == (5_000, 50_000)
+
+
+def test_rank_100k_line_comes_from_page_2000(tmp_path):
+    assert elite_picks._page_for(100_000) == 2000
+    folder = snapshot_folder(elite_picks._standings_endpoint(2000), tmp_path)
+    folder.mkdir(parents=True)
+    results = [{"rank_sort": r, "rank": r - 1, "total": 300 - (r - 99_951)} for r in range(99_951, 100_001)]
+    (folder / "20261006T090000Z.json").write_text(json.dumps({"standings": {"results": results}}))
+    t = elite_picks.build_thresholds([100_000], snapshot_dir=tmp_path)
+    assert len(t) == 1 and (t["target_rank"][0], t["rank"][0], t["total_points"][0]) == (100_000, 99_999, 251)
+    assert 100_000 in elite_picks.load_config()["threshold_ranks"]
