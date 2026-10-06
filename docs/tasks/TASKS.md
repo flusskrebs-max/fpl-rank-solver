@@ -20,7 +20,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 |---|---|---|---|
 | CLEAN | Bug check and spring clean: dead code out, docs consolidated | (none) | DONE (PR #41) |
 | RG1 | P(target) inputs from the data: line spread and drift against the group over full seasons, κ 0.75 (`--kappa`) | (none; `docs/research/rank-goal-inputs.md`) | DONE (PR #43) |
-| EOH | λ on every GW of the horizon, λ x d^k with `--eo_decay` d (default 0.7); later GWs' EO re-picked on their own xP | (none; `docs/research/eo-horizon.md`) | IN REVIEW |
+| EOH | λ on every GW of the horizon, λ x d^k with `--eo_decay` d (default 0.7); later GWs' EO re-picked on their own xP | (none; `docs/research/eo-horizon.md`) | IN REVIEW (PR #44) |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags | (to write) | TODO |
 
