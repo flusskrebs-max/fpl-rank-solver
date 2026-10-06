@@ -1,20 +1,28 @@
 # R1: One-command weekly report
 
-Status: Draft (write fully when v0.3 lands) · Size: small-medium · Release: v0.4 · Depends on: S2c, B04b-2
+Status: v1 built (rough) · Size: small-medium · Release: v0.4 · Depends on: S1, S2c (B04b-2 plugs in later)
 
 ## Why
 
 The end product is a weekly decision, not a set of modules. One command should go from fresh data to
 a short report Alex reads before the deadline.
 
-## Do (outline)
+## Do
 
-1. `uv run python -m fplrank.weekly --team <id> --target 10000` : snapshot `bootstrap-static` and
-   fixtures, pick the latest projections (Solio, else `ep_next`), EO forecast for the chosen group,
-   T_X and gap, S1 sweep, S2 choice.
-2. Write `reports/GW{n}.md` (git-ignored if it contains Solio-derived numbers): recommended moves and
-   captain, λ, P(target) for the EV plan and the chosen plan, EV cost, and the two nearest alternatives.
-3. Optional: a Windows scheduled task the evening before the deadline, alongside the collector tasks.
+1. `uv run python -m fplrank.weekly --team <id> --target 10000 [--eo AE64|solio|...]`: live API (every
+   call saved as a snapshot), latest projections (Solio, else `ep_next` with a loud warning), EO as S1
+   uses it today (last collected GW, or Solio's per-GW forecast), S1 sweep, S2c choice of λ.
+2. Write `reports/GW{n}.md` (git-ignored: Solio-derived numbers): recommended plan (moves, captain, chip,
+   XI, bench), λ, P(target) for it and the EV plan, EV cost, the EV plan if different, the two nearest
+   distinct alternatives, and the whole sweep table.
+3. Later: B04b-2's multi-GW EO forecast in place of the repeated EO; a Windows scheduled task the evening
+   before the deadline, once the manual run is trusted.
+
+## Checks
+
+- Rendering tested on fake plans (recommendation, EV plan, alternatives are distinct plans).
+- Offline slow test: sweep on the saved GW6 real team with `ep_next`, report renders.
+- Logic is shared with the S1 CLI (`pick_projections`, `pick_eo`, `rank_goal_table`), not copied.
 
 ## Done when
 
