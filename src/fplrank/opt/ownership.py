@@ -198,7 +198,7 @@ def _main(argv=None):
     p.add_argument("--sweep", action="store_true", help=f"λ in {SWEEP}")
     p.add_argument("--projections", help="Solio CSV (default: newest registered for the next GW)")
     p.add_argument("--horizon", type=int, default=5)
-    p.add_argument("--secs", type=int, default=60, help="time limit per solve")
+    p.add_argument("--secs", type=int, default=600, help="time limit per solve (upstream default; solves usually finish in seconds)")
     args = p.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")  # player names on the Windows console
 
