@@ -72,13 +72,12 @@ def form(saved: Choices) -> Choices:
                 for i, g in enumerate(MIX_GROUPS)
             }
             st.sidebar.caption("Weights are scaled to add up to 1. The line's drift uses the AE64/E64 part only.")
-        if mode == "target":
-            target = st.sidebar.number_input("Target rank", 1, 10_000_000, saved.target, step=1000)
-        else:
+        if mode == "lam":
             lam = st.sidebar.number_input("λ", -1.0, 1.0, saved.lam, step=0.05, format="%.2f")
+        target = st.sidebar.number_input("Target rank", 1, 10_000_000, saved.target, step=1000)
 
     with st.sidebar.expander("More options"):
-        if mode == "target":
+        if mode != "plain":
             p = st.number_input("Our points now (0 = from the FPL API)", 0, 5000, saved.points or 0)
             points = p or None
             k = st.number_input("κ, share of our edge that counts (0 = default 0.75)", 0.0, 1.0, saved.kappa or 0.0, step=0.05)
@@ -216,7 +215,9 @@ def main() -> None:
         first = "Solving λ = 0" + (" and the wildcard templates" if choices.mode != "plain" and choices.eo_drift else "")
         code, output = run(args, st.empty(), st.progress(0.0, text=first))
         status.update(
-            label="Done" if code == 0 else f"Stopped with an error (exit code {code})", state="complete" if code == 0 else "error"
+            label="Done" if code == 0 else f"Stopped with an error (exit code {code})",
+            state="complete" if code == 0 else "error",
+            expanded=code != 0,  # done: fold the live log away so the result sits right under it
         )
     st.session_state["output"] = output
     results(output)

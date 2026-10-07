@@ -17,7 +17,8 @@ def test_fixed_lam_and_his_flags():
     c = Choices(team_id="1", team_json=True, mode="lam", lam=0.1, eo="solio", eo_drift=False, his=his, extra='--banned "[12, 34]"')
     assert solve_args(c) == [
         "--team_id", "1", "--team_data", "json", "--horizon", "5", "--secs", "120", "--use_wc", "[8]", "--decay_base", "0.85",
-        "--preseason", "true", "--eo", "solio", "--lam", "0.1", "--eo_decay", "0.7", "--eo_drift", "false", "--banned", "[12, 34]",
+        "--preseason", "true", "--eo", "solio", "--lam", "0.1", "--target", "10000",
+        "--eo_decay", "0.7", "--eo_drift", "false", "--banned", "[12, 34]",
     ]  # fmt: skip
 
 
@@ -70,3 +71,8 @@ def test_progress_lines():
     assert progress("  3/9: λ = -0.1 solved in 12s\n") == (3, 9, "λ 3/9 solved (last: λ = -0.1)")
     assert progress("  4/50 done (30s)") == (4, 50, "simulation 4/50 done")
     assert progress("Running HiGHS 1.15.1") is None
+
+
+def test_fixed_lam_reports_p_only_when_points_can_be_found():
+    assert "--target" not in solve_args(Choices(mode="lam", lam=-0.2))
+    assert solve_args(Choices(mode="lam", lam=-0.2, points=358))[2:8] == ["--lam", "-0.2", "--target", "10000", "--points", "358"]

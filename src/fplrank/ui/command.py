@@ -127,14 +127,15 @@ def solve_args(c: Choices) -> list[str]:
         if c.eo not in EO_GROUPS:
             raise ValueError(f"unknown EO group {c.eo}")
         args += ["--eo", mix_spec(c.mix) if c.eo == "mix" else c.eo]
-        if c.mode == "target":
+        if c.mode == "lam":
+            args += ["--lam", f"{c.lam:g}"]
+        # with a fixed λ the target only reports its P against λ = 0's; that needs our points (or the team id to look them up)
+        if c.mode == "target" or c.team_id.strip() or c.points is not None:
             args += ["--target", str(c.target)]
             if c.points is not None:
                 args += ["--points", str(c.points)]
             if c.kappa is not None:
                 args += ["--kappa", f"{c.kappa:g}"]
-        else:
-            args += ["--lam", f"{c.lam:g}"]
         args += ["--eo_decay", f"{c.eo_decay:g}", "--eo_drift", "true" if c.eo_drift else "false"]
     if c.sims:
         args += ["--sims", str(c.sims)]
