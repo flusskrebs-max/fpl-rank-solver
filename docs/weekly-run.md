@@ -4,6 +4,22 @@ What to do on your PC each GW, in PowerShell from the repo folder (`cd C:\Users\
 There is one command, `uv run fplrank solve`. It is Sertalp's `solve.py` (his settings files and every
 one of his flags work unchanged) plus our two extras: the field's EO and the choice of λ.
 
+## Shortcut: one double-click
+
+`scripts\fplrank_page.cmd` does step 1 and opens the page (step 4) in one go: it pulls the latest code if
+you are on `main` (on any other branch it leaves the code alone), installs any new packages, then opens
+http://localhost:8501. Steps 2 and 3 (Solio files, team) are still yours. Close its window to stop the page.
+
+To put it on your desktop, run this once in PowerShell from the repo folder:
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\FPL solver.lnk")
+$s.TargetPath = "$PWD\scripts\fplrank_page.cmd"; $s.WorkingDirectory = "$PWD"; $s.Save()
+```
+
+Right-click the shortcut, Properties, Change Icon to give it an icon of your choice. If you move the repo
+folder, run it again.
+
 ## 1. Get the latest code (once a week)
 
 ```powershell

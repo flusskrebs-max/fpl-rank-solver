@@ -140,3 +140,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, PERF1: a `--target` run is 12 MILPs (9 λ, 3 wildcard templates) solved one after another, ~90% of
   the time in HiGHS, which uses about one core per MILP. They now run side by side in `--workers` processes (default
   half the logical CPUs, max 8), as do `--sims`; offline 8-GW benchmark 89s -> 41s on 4 cores, plans identical.
+- 2026-10-13, CLI 6: Alex asked about a .exe. A frozen PyInstaller build of the solver would be large, go stale with
+  every merged PR and trip antivirus, and still needs git for updates; so instead `scripts/fplrank_page.cmd` (pull on
+  main, `uv sync`, open the page) plus a desktop shortcut (weekly-run.md). `.gitattributes` keeps .cmd files CRLF.
