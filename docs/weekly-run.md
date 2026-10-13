@@ -4,6 +4,32 @@ What to do on your PC each GW, in PowerShell from the repo folder (`cd C:\Users\
 There is one command, `uv run fplrank solve`. It is Sertalp's `solve.py` (his settings files and every
 one of his flags work unchanged) plus our two extras: the field's EO and the choice of λ.
 
+## Shortcut: one double-click
+
+`scripts\fplrank_page.cmd` does step 1 and opens the page (step 4) in one go: it pulls the latest code if
+you are on `main` (on any other branch it leaves the code alone), installs any new packages, then opens
+http://localhost:8501. Close its window to stop the page.
+
+The box at the top of the page does steps 1 to 3 with buttons, so no PowerShell is needed once a week:
+
+- **Code**: "Get the latest code" pulls from GitHub. If anything came down, close the window and open the
+  shortcut again (that also installs any new packages).
+- **Team**: click the bookmarklet on the FPL site, paste into the box (Ctrl+V) and press "Save team". It is saved as
+  `team.json` and "Use team.json" is ticked for you. Without it, your team is read from FPL by team id at each solve.
+- **Solio files**: export both files from Solio to Downloads, then "Use the newest from Downloads". The page tells the
+  projections and the EO forecast apart by their columns (not their names), so `projection (9).csv` is fine, and
+  names the EO file by its first GW. Files older than a week are ignored. Or drag them onto the drop box.
+
+To put it on your desktop, run this once in PowerShell from the repo folder:
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\FPL solver.lnk")
+$s.TargetPath = "$PWD\scripts\fplrank_page.cmd"; $s.WorkingDirectory = "$PWD"; $s.Save()
+```
+
+Right-click the shortcut, Properties, Change Icon to give it an icon of your choice. If you move the repo
+folder, run it again.
+
 ## 1. Get the latest code (once a week)
 
 ```powershell

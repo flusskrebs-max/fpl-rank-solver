@@ -15,7 +15,8 @@ import sys
 import pandas as pd
 import streamlit as st
 
-from fplrank.paths import DATA_DIR, PROJECT_ROOT, UPSTREAM_DIR
+from fplrank.paths import DATA_DIR, PROJECT_ROOT
+from fplrank.ui import setup
 from fplrank.ui.command import (
     EO_GROUPS,
     HIS_SETTINGS,
@@ -32,7 +33,6 @@ from fplrank.ui.command import (
 )
 
 SETTINGS = DATA_DIR / "ui_settings.json"
-TEAM_JSON = UPSTREAM_DIR / "data" / "team.json"  # where his bookmarklet's team goes (docs/weekly-run.md)
 
 
 def load_choices() -> Choices:
@@ -56,8 +56,8 @@ def form(saved: Choices) -> Choices:
     team_json = st.sidebar.checkbox(
         "Use team.json from the bookmarklet", saved.team_json, help="His --team_data json: for after transfers or price changes"
     )
-    if team_json and not TEAM_JSON.exists():
-        st.sidebar.warning("No team.json yet: save it from the bookmarklet (docs/weekly-run.md, step 3) or untick this box.")
+    if team_json and not setup.TEAM_JSON.exists():
+        st.sidebar.warning("No team.json yet: paste it under Weekly setup, or untick this box.")
 
     st.sidebar.header("Rank goal")
     mode = st.sidebar.radio("Mode", list(MODES), list(MODES).index(saved.mode), format_func=MODES.get)
@@ -206,10 +206,84 @@ def results(output: str) -> None:
     st.code(output, language=None)
 
 
+def weekly_setup() -> None:
+    """Steps 1-3 of docs/weekly-run.md as buttons: latest code, team from the bookmarklet, Solio files."""
+    projections_age = setup.age(setup.SOLIO_CSV)
+    with st.container(border=True):
+        for kind, msg in st.session_state.pop("setup_msg", []):
+            getattr(st, kind)(msg)
+        code, team, solio = st.columns(3)
+
+        code.markdown("**1. Code**")
+        code.caption(f"Running: {setup.code_version()}")
+        if code.button("Get the latest code"):
+            changed, out = setup.update_code()
+            if changed:
+                code.warning("Updated. Close the solver window and open it again (the desktop shortcut) to use the new code.")
+            else:
+                code.info(out or "No change.")
+
+        team.markdown("**2. Team**")
+        team_age = setup.age(setup.TEAM_JSON)
+        team.caption(
+            "With only a team id, your team is read from FPL at each solve. After transfers or price changes, click"
+            " the bookmarklet on the FPL site and paste here." + (f" team.json saved {team_age}." if team_age else " No team.json yet.")
+        )
+        pasted = team.text_area(
+            "Team from the bookmarklet",
+            height=68,
+            placeholder='{"picks": [...',
+            label_visibility="collapsed",
+            key=f"team_paste_{st.session_state.get('pastes', 0)}",  # a new key empties the box after a save
+        )
+        if team.button("Save team"):
+            try:
+                saved = setup.save_team(pasted)
+            except ValueError as e:
+                team.error(str(e))
+            else:
+                choices = load_choices()
+                choices.team_json = True
+                save_choices(choices)
+                st.session_state["pastes"] = st.session_state.get("pastes", 0) + 1
+                st.session_state["setup_msg"] = [("success", f"Team saved ({setup.team_summary(saved)}); the solve now uses it.")]
+                st.rerun()
+
+        solio.markdown("**3. Solio files**")
+        eo_files = sorted(setup.SOLIO_EO_DIR.glob("*.csv"))
+        solio.caption(
+            f"Projections: {f'saved {projections_age}' if projections_age else 'none yet'}."
+            f" EO forecast: {f'{eo_files[-1].name}' if eo_files else 'none yet (only needed for EO from solio)'}."
+        )
+        found = setup.newest_downloads()
+        if solio.button("Use the newest from Downloads", disabled=not found, help=f"Looks in {setup.DOWNLOADS}"):
+            st.session_state["setup_msg"] = [install(p.read_bytes(), p.name) for p in found.values()]
+            st.rerun()
+        if found:
+            solio.caption("Found: " + ", ".join(f"{p.name} ({setup.age(p)})" for p in found.values()))
+        else:
+            solio.caption(f"No Solio export from the last {setup.RECENT_DAYS} days in Downloads.")
+        dropped = solio.file_uploader("Or drop the files here", type="csv", accept_multiple_files=True, key="solio_drop")
+        if dropped and solio.button("Save dropped files"):
+            st.session_state["setup_msg"] = [install(f.getvalue(), f.name) for f in dropped]
+            st.rerun()
+
+
+def install(data: bytes, name: str) -> tuple[str, str]:
+    try:
+        kind, gws, dest = setup.install(data)
+    except ValueError as e:
+        return "error", f"{name}: {e}"
+    what = "Projections" if kind == "projections" else "EO forecast"
+    span = f"GW{min(gws)}" + (f"-{max(gws)}" if max(gws) > min(gws) else "")
+    return "success", f"{what} for {span} saved from {name} (as {dest.name})."
+
+
 def main() -> None:
     st.set_page_config(page_title="Risky Solver", layout="wide")
     st.title("Risky Solver")
-    st.caption("Fills in `fplrank solve` and runs it on this PC. Solio files and team.json go where docs/weekly-run.md says.")
+    st.caption("Fills in `fplrank solve` and runs it on this PC.")
+    weekly_setup()
     try:
         choices = form(load_choices())
         args = solve_args(choices)
