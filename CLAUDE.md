@@ -63,7 +63,7 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   last GW's EO carried forward; replaces scraping Solio's EO. The setup box takes it like a Solio file.
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
-  the B01 long shape (deadline EO with chips; `opt.ownership.chip_free_eo` takes them out for `--eo`). Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).
+  the B01 long shape (deadline EO with chips; `opt.ownership.chip_free_eo` takes them out for `--eo`). Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`), and the setup box's "Get the field's squads" button.
 - `src/fplrank/model/naive_field.py`: his solver on every AE64/E64 squad (EO idea 3); `model/eo_blend.py`: the EO blend
   (fair persistence, XI/captain re-pick, drift, banked solve, templates) and the critique checks; `docs/research/eo-blend.md`.
 - `src/fplrank/eval/spread.py`: V1, S2's predicted sd against real managers' realised spread (`docs/research/realised-spread.md`).

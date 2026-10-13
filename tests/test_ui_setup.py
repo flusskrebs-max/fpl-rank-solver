@@ -70,3 +70,28 @@ def test_save_team(dirs):
     for bad in ("not json", '{"detail": "Not logged in"}'):
         with pytest.raises(ValueError):
             setup.save_team(bad)
+
+
+def test_squads_status(tmp_path):
+    import pandas as pd
+
+    assert setup.squads_gw(tmp_path) == {}
+    pd.DataFrame({"entry_id": [1, 1, 2, 3], "gw": [4, 5, 5, 4]}).to_parquet(tmp_path / "picks.parquet")
+    pd.DataFrame({"set": ["AE64", "E64", "top10k", "other"], "entry_id": [1, 2, 3, 1]}).to_parquet(tmp_path / "members.parquet")
+    gws = setup.squads_gw(tmp_path)
+    assert gws == {"AE64": 5, "E64": 5, "top10k": 4}
+    assert setup.squads_summary(gws, 6) == (True, "AE64 GW5, E64 GW5, top10k GW4. GW6 has started: get the squads before solving.")
+    assert setup.squads_summary({"AE64": 6, "E64": 6}, 6) == (False, "All groups: GW6. Up to date.")
+    assert setup.squads_summary({}, 6)[0]
+
+
+def test_last_deadline(tmp_path):
+    from datetime import UTC, datetime
+
+    assert setup.last_deadline(tmp_path) is None
+    folder = tmp_path / "bootstrap-static"
+    folder.mkdir()
+    events = [{"id": g, "deadline_time": f"2026-10-{d:02d}T10:00:00Z"} for g, d in ((6, 3), (7, 17))]
+    (folder / "20261001T000000Z.json").write_text(json.dumps({"events": events}))
+    assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 13, tzinfo=UTC)) == 6
+    assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 1, tzinfo=UTC)) is None

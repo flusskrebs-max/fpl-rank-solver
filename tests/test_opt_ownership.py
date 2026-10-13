@@ -274,3 +274,12 @@ def test_custom_mix_load_eo(tmp_path, monkeypatch):
     eo, gw = ow.load_eo("AE64:3+E64:1", 5, collected_dir=tmp_path)
     assert gw == 5 and eo[7] == pytest.approx(0.875)
     assert ow.load_eo("E64:1", 5, collected_dir=tmp_path)[0][7] == pytest.approx(0.5)
+
+
+def test_pick_eo_warns_when_the_squads_are_behind(monkeypatch, capsys):
+    proj = pd.DataFrame({"ID": [1, 2], "7_Pts": [5.0, 3.0]})
+    for squads_gw, warned in ((5, True), (6, False)):
+        monkeypatch.setattr(ow, "repick_eo", lambda *a, g=squads_gw, **k: (pd.DataFrame({7: pd.Series({1: 1.2})}), g))
+        _, text = ow.pick_eo("AE64", {}, 7, proj)
+        assert f"GW{squads_gw} squads" in text
+        assert ("WARNING: the field's squads are from GW5" in capsys.readouterr().out) is warned
