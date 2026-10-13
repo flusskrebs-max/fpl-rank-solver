@@ -148,3 +148,16 @@ def test_workers_give_the_same_plans_as_one_at_a_time(request_fn, monkeypatch):
     assert len(plans[1]) == len(plans[2]) == 2
     for a, b in zip(plans[1], plans[2], strict=True):
         pd.testing.assert_frame_equal(a.reset_index(drop=True), b.reset_index(drop=True))
+
+
+def test_chips_outside_the_horizon_are_left_out(capsys):
+    options = {"horizon": 8, "use_bb": [19], "use_tc": [9, 20], "use_wc": 7, "use_fh": []}
+    cli.chips_in_horizon(options, 7)
+    assert (options["use_bb"], options["use_tc"], options["use_wc"], options["use_fh"]) == ([], [9], [7], [])
+    assert "use_bb [19]: left out GWs outside the horizon GW7-14" in capsys.readouterr().out
+
+
+@pytest.mark.slow
+def test_a_chip_past_the_horizon_does_not_stop_the_solve(request_fn):
+    r = cli.run([*HIS_FLAGS, "--use_bb", "[19]"], request=request_fn, quiet=True)
+    assert "use_bb [19]: left out" in r.output and r.solution["chip"] == "WC6"

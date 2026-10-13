@@ -184,6 +184,19 @@ def default_workers() -> int:
     return max(1, min((os.cpu_count() or 1) // 2, MAX_DEFAULT_WORKERS))
 
 
+def chips_in_horizon(options: dict, next_gw: int) -> None:
+    """Drop chip GWs (`use_wc`, `use_bb`, `use_fh`, `use_tc`) outside the GWs he plans: his solve fails on them
+    (KeyError on the GW) rather than ignoring a chip it cannot reach."""
+    last = min(next_gw + options.get("horizon", 3) - 1, 38)
+    for chip in ("wc", "bb", "fh", "tc"):
+        gws = options.get(f"use_{chip}") or []
+        gws = [gws] if isinstance(gws, int) else gws
+        kept = [int(w) for w in gws if next_gw <= int(w) <= last]
+        if len(kept) != len(gws):
+            print(f"use_{chip} {gws}: left out GWs outside the horizon GW{next_gw}-{last}")
+        options[f"use_{chip}"] = kept
+
+
 class _Prepared(Exception):  # noqa: N818 (not an error: a dry run stops here)
     pass
 
@@ -210,6 +223,7 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime
     def keep(data, opts):
         if dry:
             raise _Prepared
+        chips_in_horizon(opts, data["next_gw"])
         response = solve_mp(data, opts)
         solved.append(response)
         return response
