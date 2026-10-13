@@ -115,15 +115,23 @@ def code_version() -> str:
 
 
 def update_code() -> tuple[bool, str]:
-    """`git pull --ff-only` on main (never a merge; a branch checked out to try a PR is left alone).
-    Returns whether the code changed, and what git said."""
+    """`git pull --ff-only` on main (never a merge). If the folder is on another branch (a Claude session on this PC
+    leaves it on its own), switch back to main first; uncommitted changes to tracked files are stashed, not lost.
+    Returns whether the code changed, and what happened."""
+    before = git("rev-parse", "HEAD").stdout.strip()
+    notes = []
     branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     if branch != "main":
-        return False, f'On branch "{branch}", not main: not updating.'
-    before = git("rev-parse", "HEAD").stdout.strip()
+        if git("diff", "--quiet", "HEAD").returncode != 0:
+            git("stash", "push", "-m", f"fplrank page: changes on {branch}, set aside to update")
+            notes.append(f'Changes on "{branch}" set aside (git stash list).')
+        switch = git("checkout", "main")
+        if switch.returncode != 0:
+            return False, f'Could not switch from "{branch}" to main: {(switch.stdout + switch.stderr).strip()}'
+        notes.append(f'Switched from branch "{branch}" to main.')
     pull = git("pull", "--ff-only")
     after = git("rev-parse", "HEAD").stdout.strip()
-    return before != after, (pull.stdout + pull.stderr).strip()
+    return before != after, "\n".join([*notes, (pull.stdout + pull.stderr).strip()]).strip()
 
 
 def age(path: Path) -> str | None:

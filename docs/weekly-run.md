@@ -7,12 +7,13 @@ one of his flags work unchanged) plus our two extras: the field's EO and the cho
 ## Shortcut: one double-click
 
 `scripts\fplrank_page.cmd` does step 1 and opens the page (step 4) in one go: it pulls the latest code if
-you are on `main` (on any other branch it leaves the code alone), installs any new packages, then opens
+you are on `main` (on any other branch it switches back to `main` first, setting aside any uncommitted changes with
+`git stash`), installs any new packages, then opens
 http://localhost:8501. Close its window to stop the page.
 
 The box at the top of the page does steps 1 to 3 with buttons, plus the field's squads,, so no PowerShell is needed once a week:
 
-- **Code**: "Get the latest code" pulls from GitHub. If anything came down, close the window and open the
+- **Code**: "Get the latest code" pulls from GitHub (switching back to `main` first if needed). If anything came down, close the window and open the
   shortcut again (that also installs any new packages).
 - **Team**: click the bookmarklet on the FPL site, paste into the box (Ctrl+V) and press "Save team". It is saved as
   `team.json` and "Use team.json" is ticked for you. Without it, your team is read from FPL by team id at each solve.
