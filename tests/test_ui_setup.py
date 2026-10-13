@@ -3,6 +3,7 @@
 import gzip
 import json
 import os
+import subprocess
 import time
 from datetime import date
 from pathlib import Path
@@ -95,3 +96,43 @@ def test_last_deadline(tmp_path):
     (folder / "20261001T000000Z.json").write_text(json.dumps({"events": events}))
     assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 13, tzinfo=UTC)) == 6
     assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 1, tzinfo=UTC)) is None
+
+
+def _repo(tmp_path, monkeypatch):
+    """A clone of a one-commit origin, plus a new commit on origin's main; `setup.git` points at the clone."""
+    origin, clone = tmp_path / "origin", tmp_path / "clone"
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+
+    def run(cwd, *args):
+        subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+    origin.mkdir()
+    run(origin, "init", "-b", "main")
+    (origin / "a.txt").write_text("1")
+    run(origin, "add", ".")
+    run(origin, "commit", "-m", "one")
+    run(tmp_path, "clone", str(origin), str(clone))
+    (origin / "a.txt").write_text("2")
+    run(origin, "commit", "-am", "two")
+    monkeypatch.setattr(setup, "PROJECT_ROOT", clone)
+    return clone, run
+
+
+def test_update_code_switches_from_a_branch_to_main(tmp_path, monkeypatch):
+    clone, run = _repo(tmp_path, monkeypatch)
+    run(clone, "switch", "-c", "try-pr")
+    changed, said = setup.update_code()
+    assert changed and 'Switched from branch "try-pr" to main.' in said
+    assert setup.git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "main"
+    assert (clone / "a.txt").read_text() == "2"
+
+
+def test_update_code_leaves_a_branch_with_uncommitted_edits(tmp_path, monkeypatch):
+    clone, run = _repo(tmp_path, monkeypatch)
+    run(clone, "switch", "-c", "try-pr")
+    (clone / "a.txt").write_text("edited")
+    changed, said = setup.update_code()
+    assert not changed and "uncommitted changes" in said
+    assert (clone / "a.txt").read_text() == "edited"

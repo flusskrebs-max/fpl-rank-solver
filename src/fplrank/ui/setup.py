@@ -115,15 +115,22 @@ def code_version() -> str:
 
 
 def update_code() -> tuple[bool, str]:
-    """`git pull --ff-only` on main (never a merge; a branch checked out to try a PR is left alone).
+    """Switch to main if another branch is checked out, then `git pull --ff-only` (never a merge).
+    Uncommitted edits to tracked files block the switch and are left alone.
     Returns whether the code changed, and what git said."""
+    before = git("rev-parse", "HEAD").stdout.strip()
+    said = ""
     branch = git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     if branch != "main":
-        return False, f'On branch "{branch}", not main: not updating.'
-    before = git("rev-parse", "HEAD").stdout.strip()
+        if git("status", "--porcelain", "--untracked-files=no").stdout.strip():
+            return False, f'On branch "{branch}" with uncommitted changes: not switching to main or updating.'
+        switch = git("switch", "main")
+        if switch.returncode != 0:
+            return False, f'On branch "{branch}"; could not switch to main: {(switch.stdout + switch.stderr).strip()}'
+        said = f'Switched from branch "{branch}" to main.\n'
     pull = git("pull", "--ff-only")
     after = git("rev-parse", "HEAD").stdout.strip()
-    return before != after, (pull.stdout + pull.stderr).strip()
+    return before != after, said + (pull.stdout + pull.stderr).strip()
 
 
 def age(path: Path) -> str | None:

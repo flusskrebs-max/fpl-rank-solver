@@ -6,8 +6,16 @@ cd /d "%~dp0.."
 set "UV=%USERPROFILE%\.local\bin\uv.exe"
 if not exist "%UV%" set "UV=uv"
 
-rem Only update when on main, so a branch checked out to try a PR is left alone.
+rem Back to main if another branch is checked out (unless it has uncommitted edits), then update.
 for /f "delims=" %%b in ('git rev-parse --abbrev-ref HEAD') do set "BRANCH=%%b"
+if /i not "%BRANCH%"=="main" (
+    set "DIRTY="
+    for /f "delims=" %%s in ('git status --porcelain --untracked-files^=no') do set "DIRTY=1"
+    if not defined DIRTY (
+        echo Switching from branch "%BRANCH%" to main...
+        git switch main && set "BRANCH=main"
+    )
+)
 if /i "%BRANCH%"=="main" (
     echo Getting the latest code from GitHub...
     git pull --ff-only
@@ -19,7 +27,7 @@ if /i "%BRANCH%"=="main" (
         pause
     )
 ) else (
-    echo On branch "%BRANCH%", not main: skipping the update.
+    echo On branch "%BRANCH%" with uncommitted changes: skipping the update.
 )
 
 echo Installing any new packages...
