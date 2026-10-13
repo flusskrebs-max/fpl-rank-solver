@@ -345,6 +345,11 @@ def pick_eo(
             players = int((first > 0).sum())
             how = f"drifting towards {tm['template'].nunique()} wildcard squads" if tm is not None else "re-picked on each GW's xP"
             text = f"{group} GW{eo_gw} squads, {how} (GW{next_gw}: {players} players, total {first.sum():.1f})"
+            if eo_gw < next_gw - 1:
+                print(
+                    f"WARNING: the field's squads are from GW{eo_gw}, but GW{next_gw - 1} has been played. Press"
+                    ' "Get the field\'s squads" on the page (or run the collector) for an up-to-date EO forecast.'
+                )
             return eo, text
     eo, eo_gw = load_eo(group, next_gw - 1)
     return eo, f"{group} collected GW{eo_gw}, repeated ({len(eo)} players, total {eo.sum():.1f})"

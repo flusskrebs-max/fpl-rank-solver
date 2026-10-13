@@ -1,15 +1,15 @@
-"""The page's weekly setup: latest code, the team from his bookmarklet and the Solio files (steps 1-3 of
-docs/weekly-run.md), so none of them needs PowerShell. No modelling here."""
+"""The page's weekly setup: latest code, the team from his bookmarklet, the Solio files and the field's squads
+(steps 1-4 of docs/weekly-run.md), so none of them needs PowerShell. No modelling here."""
 
 import json
 import re
 import subprocess
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from fplrank.data import eo_paste
-from fplrank.paths import PROJECT_ROOT, PROJECTIONS_DIR, UPSTREAM_DIR
+from fplrank.paths import COLLECTED_DIR, PROJECT_ROOT, PROJECTIONS_DIR, SNAPSHOT_DIR, UPSTREAM_DIR
 
 TEAM_JSON = UPSTREAM_DIR / "data" / "team.json"  # where his bookmarklet's team goes (--team_data json)
 SOLIO_CSV = UPSTREAM_DIR / "data" / "solio.csv"  # the projections his solver reads (datasource solio)
@@ -135,3 +135,47 @@ def age(path: Path) -> str | None:
     if hours < 1:
         return "just now"
     return f"{hours:.0f} h ago" if hours < 48 else f"{hours / 24:.0f} days ago"
+
+
+SQUAD_SETS = ("AE64", "E64", "top1000", "top10k")
+# what the page's button runs: the collector without transfers (the EO forecast doesn't use them)
+COLLECT = ("fplrank.collect.elite_picks", "collect", "--no-transfers")
+
+
+def last_deadline(snapshot_dir: Path = SNAPSHOT_DIR, now: datetime | None = None) -> int | None:
+    """The latest GW whose deadline has passed, from the newest saved FPL bootstrap (deadlines are set for the
+    season, so an old one will do); None without one."""
+    from fplrank.data.fpl_api import latest_snapshot
+
+    try:
+        events = latest_snapshot("bootstrap-static/", snapshot_dir)["events"]
+    except (FileNotFoundError, KeyError, ValueError):
+        return None
+    now = now or datetime.now(UTC)
+    passed = [e["id"] for e in events if datetime.fromisoformat(e["deadline_time"]) <= now]
+    return max(passed) if passed else None
+
+
+def squads_gw(collected_dir: Path = COLLECTED_DIR) -> dict[str, int]:
+    """The latest GW of the collector's picks for each manager set (sets with none left out)."""
+    import pandas as pd
+
+    try:
+        picks = pd.read_parquet(collected_dir / "picks.parquet", columns=["entry_id", "gw"])
+        members = pd.read_parquet(collected_dir / "members.parquet", columns=["set", "entry_id"])
+    except (FileNotFoundError, OSError, ValueError):
+        return {}
+    last = picks.groupby("entry_id")["gw"].max()
+    gws = members.assign(gw=members["entry_id"].map(last)).dropna().groupby("set")["gw"].max()
+    return {s: int(gws[s]) for s in SQUAD_SETS if s in gws}
+
+
+def squads_summary(gws: dict[str, int], played: int | None) -> tuple[bool, str]:
+    """Whether the field's squads are behind the last GW played, and a line saying so."""
+    if not gws:
+        return True, "No squads collected yet."
+    oldest = min(gws.values())
+    text = ", ".join(f"{s} GW{g}" for s, g in gws.items()) + "." if len(set(gws.values())) > 1 else f"All groups: GW{oldest}."
+    if played is not None and oldest < played:
+        return True, f"{text} GW{played} has started: get the squads before solving."
+    return False, text + (" Up to date." if played is not None else "")

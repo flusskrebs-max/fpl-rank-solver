@@ -10,7 +10,7 @@ one of his flags work unchanged) plus our two extras: the field's EO and the cho
 you are on `main` (on any other branch it leaves the code alone), installs any new packages, then opens
 http://localhost:8501. Close its window to stop the page.
 
-The box at the top of the page does steps 1 to 3 with buttons, so no PowerShell is needed once a week:
+The box at the top of the page does steps 1 to 3 with buttons, plus the field's squads,, so no PowerShell is needed once a week:
 
 - **Code**: "Get the latest code" pulls from GitHub. If anything came down, close the window and open the
   shortcut again (that also installs any new packages).
@@ -25,6 +25,12 @@ The box at the top of the page does steps 1 to 3 with buttons, so no PowerShell 
   (triple captains counted once; players not listed 0.1%) and saves it where `--eo solio` reads it. It names any row
   it couldn't match to a player. Needs the FPL API (or a saved bootstrap) to match names. Only needed for `--eo solio`:
   `--eo AE64`, `top10k` and the rest come from the collector and need no file.
+
+- **Field's squads**: what the EO forecast is built from (every AE64 and E64 manager, the top 1000 and a top-10k
+  sample, from FPL). The box shows which GW they are from and turns yellow when a newer GW has started; then press
+  "Get the field's squads" before solving (about half an hour; it carries on where it stopped if interrupted). The
+  solve also prints a WARNING if the squads are older than last GW. The scheduled runs (`docs/collect-schedule.md`)
+  usually keep them up to date, but only when the PC is on at 20:00.
 
 To put it on your desktop, run this once in PowerShell from the repo folder:
 
@@ -129,7 +135,8 @@ only the ones you change are passed on. It remembers your choices. Steps 1 to 3 
 P by λ shows how much the choice matters: early in the season the differences are small, because one
 week's plan matters little over 30+ GWs. The simulations summary shows which moves are robust to
 noise. Tell Claude in the project which plan you used and anything odd; it goes in
-`docs/tasks/log.md`. The collector runs itself on Tuesday and Friday at 20:00 (`docs/collect-schedule.md`).
+`docs/tasks/log.md`. The collector runs itself on Tuesday and Friday at 20:00 when the PC is on (`docs/collect-schedule.md`);
+the setup box shows whether it has kept up.
 
 ## If something goes wrong
 

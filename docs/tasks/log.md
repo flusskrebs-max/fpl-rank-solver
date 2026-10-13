@@ -148,3 +148,7 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, EOP: Alex dropped scraping Solio's EO. `fplrank.data.eo_paste` builds the `--eo solio` file (Solio's layout
   plus an `ID` column, which `load_solio_eo` now uses) from an EO table such as the GW6 top-10k CSV: chip-free EO
   carried forward to GW38, unlisted 0.1%. The setup box takes the table from Downloads, the drop box or a paste.
+- 2026-10-13, FS1: the collector had stalled at GW5 (Friday's run closed 8 s in; it opened a visible console), so
+  `--eo` was forecasting from GW5 squads with no sign of it. The setup box now shows the squads' GW per group with a
+  "Get the field's squads" button (`collect --no-transfers`, a third fewer requests), and `fplrank solve` warns when
+  the squads are older than last GW. The two scheduled tasks were switched to headless on Alex's PC.

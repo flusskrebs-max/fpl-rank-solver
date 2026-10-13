@@ -200,3 +200,14 @@ def test_deadline_picks_undo_automatic_subs():
     rows = {r["fpl_id"]: r for r in elite_picks.deadline_picks(101, 5, payload)}
     assert rows[11]["position"] == 11 and rows[12]["position"] == 12
     assert rows[11]["auto_sub"] and rows[12]["auto_sub"] and not rows[1]["auto_sub"]
+
+
+def test_rerun_without_transfers_skips_them(collected):
+    collector, config, _ = collected
+    collector.now = NOW + timedelta(hours=13)
+    collector.api.calls.clear()
+    collector.collect(config, transfers=False)
+    assert "entry/101/history/" in collector.api.calls
+    assert not any("transfers" in c for c in collector.api.calls)
+    transfers = pd.read_parquet(collector.out_dir / "transfers.parquet")  # the saved ones are kept
+    assert transfers["element_in"].tolist() == [16]

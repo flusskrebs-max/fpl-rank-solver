@@ -8,6 +8,7 @@ import contextlib
 import dataclasses
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -152,12 +153,13 @@ def his_settings(saved: dict) -> tuple[dict, list[str]]:
     return changed, errors
 
 
-def run(args: list[str], box, bar) -> tuple[int, str]:
-    """`fplrank solve` in its own process, its output shown in `box` as it arrives and its λ (or simulation) count in
-    `bar`. The process is stopped if the page stops first (a widget changed, Solve pressed again, the tab closed)."""
+def run(args: list[str], box, bar, module: tuple[str, ...] = ("fplrank.cli", "solve"), step=progress) -> tuple[int, str]:
+    """`fplrank solve` (or another `module`) in its own process, its output shown in `box` as it arrives and its
+    progress (`step` of a line) in `bar`. The process is stopped if the page stops first (a widget changed, Solve
+    pressed again, the tab closed)."""
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
     proc = subprocess.Popen(
-        [sys.executable, "-m", "fplrank.cli", "solve", *args],
+        [sys.executable, "-m", *module, *args],
         cwd=PROJECT_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -172,8 +174,8 @@ def run(args: list[str], box, bar) -> tuple[int, str]:
     try:
         for line in proc.stdout:
             lines.append(line)
-            if step := progress(line):
-                bar.progress(step[0] / step[1], text=step[2])
+            if done := step(line):
+                bar.progress(done[0] / done[1], text=done[2])
             box.code("".join(lines[-40:]), language=None)
         return proc.wait(), "".join(lines)
     finally:
@@ -207,12 +209,13 @@ def results(output: str) -> None:
 
 
 def weekly_setup() -> None:
-    """Steps 1-3 of docs/weekly-run.md as buttons: latest code, team from the bookmarklet, Solio files."""
+    """Steps 1-4 of docs/weekly-run.md as buttons: latest code, team from the bookmarklet, Solio files, the
+    field's squads."""
     projections_age = setup.age(setup.SOLIO_CSV)
     with st.container(border=True):
         for kind, msg in st.session_state.pop("setup_msg", []):
             getattr(st, kind)(msg)
-        code, team, solio = st.columns(3)
+        code, team, solio, field = st.columns(4)
 
         code.markdown("**1. Code**")
         code.caption(f"Running: {setup.code_version()}")
@@ -278,6 +281,34 @@ def weekly_setup() -> None:
             st.session_state["setup_msg"] = [install(table.encode("utf-8"), "the pasted table")]
             st.session_state["eo_pastes"] = st.session_state.get("eo_pastes", 0) + 1
             st.rerun()
+
+        field.markdown("**4. Field's squads**")
+        behind, text = setup.squads_summary(setup.squads_gw(), setup.last_deadline())
+        field.caption(
+            "Every AE64 and E64 manager's squad, the top 1000 and a top-10k sample, from FPL: what the EO forecast is"
+            " built from. Fetching a new GW takes about half an hour."
+        )
+        (field.warning if behind else field.caption)(text)
+        if field.button("Get the field's squads", type="primary" if behind else "secondary"):
+            with field.status("Getting the squads…", expanded=True) as status:
+                code_, out = run([], st.empty(), st.progress(0.0, text="Starting"), module=setup.COLLECT, step=collect_progress)
+                status.update(label="Done" if code_ == 0 else "Stopped with an error", state="complete" if code_ == 0 else "error")
+            if code_ == 0:
+                st.session_state["setup_msg"] = [
+                    ("success", "Squads updated: " + setup.squads_summary(setup.squads_gw(), setup.last_deadline())[1])
+                ]
+            else:
+                st.session_state["setup_msg"] = [
+                    ("error", "Getting the squads stopped. It picks up where it left off; last lines:\n\n" + out[-800:])
+                ]
+            st.rerun()
+
+
+def collect_progress(line: str) -> tuple[int, int, str] | None:
+    """(done, total, text) from the collector's `  50/2022 managers done` lines."""
+    if m := re.search(r"(\d+)/(\d+) managers done", line):
+        return int(m[1]), int(m[2]), f"{m[1]} of {m[2]} managers"
+    return None
 
 
 def install(data: bytes, name: str) -> tuple[str, str]:

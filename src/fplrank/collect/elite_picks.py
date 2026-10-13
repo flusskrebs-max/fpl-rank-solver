@@ -152,8 +152,10 @@ class Collector:
         members["collected_at"] = self.now.isoformat(timespec="seconds")
         return members
 
-    def collect(self, config: dict) -> dict:
-        """Download everything needed for `config`'s sets, then rebuild the tables. Returns a summary."""
+    def collect(self, config: dict, transfers: bool = True) -> dict:
+        """Download everything needed for `config`'s sets, then rebuild the tables. Returns a summary.
+        `transfers=False` leaves each manager's transfers as last saved: a third fewer requests, and the EO
+        forecast doesn't use them (the page's "Get the field's squads" button)."""
         bootstrap = self.fetch("bootstrap-static/", self.max_age)
         self.fetch("fixtures/", self.max_age)
         started = {e["id"]: e for e in bootstrap["events"] if datetime.fromisoformat(e["deadline_time"]) <= self.now}
@@ -167,7 +169,8 @@ class Collector:
         for i, entry in enumerate(entries, 1):
             try:
                 history = self.fetch(f"entry/{entry}/history/", self.max_age)
-                self.fetch(f"entry/{entry}/transfers/", self.max_age)
+                if transfers:
+                    self.fetch(f"entry/{entry}/transfers/", self.max_age)
                 for gw in (h["event"] for h in history["current"] if h["event"] in started):
                     self.fetch(f"entry/{entry}/event/{gw}/picks/", None)
             except requests.HTTPError as err:
@@ -457,6 +460,7 @@ def _main(argv=None):
     col.add_argument("--top", type=int, help="override overall_top with a single N (e.g. 20 for a quick test)")
     col.add_argument("--max-age-hours", type=float, default=12, help="re-download standings/history/transfers older than this")
     col.add_argument("--config", type=Path, default=CONFIG_PATH)
+    col.add_argument("--no-transfers", action="store_true", help="skip transfers (not needed for EO): a quicker run")
     bld = sub.add_parser("build", help="rebuild the tables from saved snapshots (no downloads)")
     bld.add_argument("--config", type=Path, default=CONFIG_PATH)
     rep = sub.add_parser("report", help="write the top-N vs Elite 64 comparison to docs/research/")
@@ -478,7 +482,7 @@ def _main(argv=None):
     if args.top:  # quick test: just the top N
         config["overall_top"], config["sampled"] = [args.top], {}
     start = time.monotonic()
-    summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config)
+    summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config, transfers=not args.no_transfers)
     print(f"Done in {(time.monotonic() - start) / 60:.1f} min: {summary}")
 
 
