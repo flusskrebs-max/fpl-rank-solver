@@ -24,8 +24,12 @@ Survivorship: `overall_top` sets come from the standings at collection time, so 
 the GW1 picks of today's top 1000. `ranks` keeps each member's overall rank by GW so "top N as of
 GW t" can be reconstructed later.
 
+`--squads` is the quick weekly run (the page's "Get the field's squads" button): standings and each member's
+picks for the latest started GW only, a few requests at a time. That is all `--eo` and the target line need;
+history (weekly ranks, past seasons) and transfers are for research and come with the full run.
+
 CLI:
-    uv run python -m fplrank.collect.elite_picks collect [--top N] [--max-age-hours H]
+    uv run python -m fplrank.collect.elite_picks collect [--top N] [--max-age-hours H] [--squads]
     uv run python -m fplrank.collect.elite_picks build
     uv run python -m fplrank.collect.elite_picks report
     uv run python -m fplrank.collect.elite_picks cutoffs   # end-of-season rank cut-offs report
@@ -34,8 +38,12 @@ CLI:
 import argparse
 import json
 import math
+import os
+import re
+import threading
 import time
 import tomllib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from pathlib import Path
@@ -71,13 +79,15 @@ class PoliteApi(FplApi):
         self.min_interval = min_interval
         self.requests = 0
         self._last = 0.0
+        self._lock = threading.Lock()  # the gap holds across threads (`collect(workers=...)`)
 
     def get(self, endpoint: str, save: bool = True) -> dict | list:
-        wait = self._last + self.min_interval - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        self._last = time.monotonic()
-        self.requests += 1
+        with self._lock:
+            wait = self._last + self.min_interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            self._last = time.monotonic()
+            self.requests += 1
         return super().get(endpoint, save)
 
 
@@ -152,10 +162,11 @@ class Collector:
         members["collected_at"] = self.now.isoformat(timespec="seconds")
         return members
 
-    def collect(self, config: dict, transfers: bool = True) -> dict:
+    def collect(self, config: dict, transfers: bool = True, squads: bool = False, workers: int = 1) -> dict:
         """Download everything needed for `config`'s sets, then rebuild the tables. Returns a summary.
-        `transfers=False` leaves each manager's transfers as last saved: a third fewer requests, and the EO
-        forecast doesn't use them (the page's "Get the field's squads" button)."""
+        `transfers=False` leaves each manager's transfers as last saved. `squads=True` fetches only each member's
+        picks for the latest started GW (no history, transfers or live scores): the quick weekly run. `workers`
+        managers are fetched side by side (the API's minimum gap between requests still holds)."""
         bootstrap = self.fetch("bootstrap-static/", self.max_age)
         self.fetch("fixtures/", self.max_age)
         started = {e["id"]: e for e in bootstrap["events"] if datetime.fromisoformat(e["deadline_time"]) <= self.now}
@@ -164,27 +175,42 @@ class Collector:
         members.to_parquet(self.out_dir / "members.parquet", index=False)
 
         entries = members["entry_id"].unique().tolist()
-        self.log(f"{len(entries)} managers, GW{min(started)}-{max(started)}")
+        latest = max(started)
+        self.log(f"{len(entries)} managers, " + (f"GW{latest} squads only" if squads else f"GW{min(started)}-{latest}"))
+
+        def one(entry):
+            if squads:
+                try:
+                    self.fetch(f"entry/{entry}/event/{latest}/picks/", None)
+                except requests.HTTPError as err:  # 404: no team that GW (joined later); not a failure
+                    if err.response is None or err.response.status_code != 404:
+                        raise
+                return
+            history = self.fetch(f"entry/{entry}/history/", self.max_age)
+            if transfers:
+                self.fetch(f"entry/{entry}/transfers/", self.max_age)
+            for gw in (h["event"] for h in history["current"] if h["event"] in started):
+                self.fetch(f"entry/{entry}/event/{gw}/picks/", None)
+
         failed = []
-        for i, entry in enumerate(entries, 1):
-            try:
-                history = self.fetch(f"entry/{entry}/history/", self.max_age)
-                if transfers:
-                    self.fetch(f"entry/{entry}/transfers/", self.max_age)
-                for gw in (h["event"] for h in history["current"] if h["event"] in started):
-                    self.fetch(f"entry/{entry}/event/{gw}/picks/", None)
-            except requests.HTTPError as err:
-                failed.append(entry)
-                self.log(f"  entry {entry}: {err}")
-            if i % 50 == 0 or i == len(entries):
-                self.log(f"  {i}/{len(entries)} managers done ({getattr(self.api, 'requests', '?')} requests so far)")
-        for gw, event in started.items():
-            self.fetch(f"event/{gw}/live/", None if event["finished"] else self.max_age)
+        with ThreadPoolExecutor(max(workers, 1)) as pool:
+            jobs = {pool.submit(one, entry): entry for entry in entries}
+            for i, job in enumerate(as_completed(jobs), 1):
+                if (err := job.exception()) is not None:
+                    if not isinstance(err, requests.HTTPError):
+                        raise err
+                    failed.append(jobs[job])
+                    self.log(f"  entry {jobs[job]}: {err}")
+                if i % 50 == 0 or i == len(entries):
+                    self.log(f"  {i}/{len(entries)} managers done ({getattr(self.api, 'requests', '?')} requests so far)")
+        if not squads:
+            for gw, event in started.items():
+                self.fetch(f"event/{gw}/live/", None if event["finished"] else self.max_age)
         for rank in config.get("threshold_ranks", []):  # T_X(now): the standings page holding rank X
             self.fetch(_standings_endpoint(_page_for(rank)), self.max_age)
 
         tables = build(config["season"], self.out_dir, self.snapshot_dir, config.get("threshold_ranks", []))
-        return {"managers": len(entries), "failed": failed, "gws": sorted(started), "rows": {k: len(v) for k, v in tables.items()}}
+        return {"managers": len(entries), "failed": sorted(failed), "gws": sorted(started), "rows": {k: len(v) for k, v in tables.items()}}
 
 
 def _standings_endpoint(page: int, league: int = 314) -> str:
@@ -193,6 +219,20 @@ def _standings_endpoint(page: int, league: int = 314) -> str:
 
 def _page_for(rank: int) -> int:
     return math.ceil(rank / STANDINGS_PAGE_SIZE)
+
+
+def _saved_picks(snapshot_dir: Path) -> dict[int, set[int]]:
+    """entry_id -> GWs with a saved picks snapshot (from the snapshot folders' names, one directory listing)."""
+    pattern = re.compile(re.escape(snapshot_folder("entry/0/event/0/picks/", snapshot_dir).name).replace("0", r"(\d+)"))
+    out: dict[int, set[int]] = {}
+    try:
+        names = os.listdir(snapshot_dir)
+    except OSError:
+        return out
+    for name in names:
+        if m := pattern.fullmatch(name):
+            out.setdefault(int(m[1]), set()).add(int(m[2]))
+    return out
 
 
 def _latest(endpoint: str, snapshot_dir: Path) -> dict | list | None:
@@ -251,9 +291,16 @@ def season_cutoffs(past: pd.DataFrame, ranks=(100, 1_000, 10_000, 100_000)) -> p
 def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPSHOT_DIR, threshold_ranks=()) -> dict[str, pd.DataFrame]:
     """Rebuild the tables from the latest snapshots of every member's endpoints (and all standings snapshots)."""
     members = pd.read_parquet(out_dir / "members.parquet")
+    saved = _saved_picks(snapshot_dir)
     picks, chips, transfers, ranks, past = [], [], [], [], []
     for entry in members["entry_id"].unique().tolist():
         history = _latest(f"entry/{entry}/history/", snapshot_dir)
+        # picks for every GW saved, whether or not the history is (yet): a squads-only run fetches no history
+        played = sorted(saved.get(entry, set()) | {h["event"] for h in (history or {}).get("current", [])})
+        for gw in played:
+            gw_picks = _latest(f"entry/{entry}/event/{gw}/picks/", snapshot_dir)
+            if gw_picks is not None:
+                picks += deadline_picks(entry, gw, gw_picks)
         if history is None:
             continue
         past += [
@@ -262,9 +309,6 @@ def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPS
         ]
         for h in history["current"]:
             ranks.append({"entry_id": entry, "gw": h["event"], **{k: v for k, v in h.items() if k != "event"}})
-            gw_picks = _latest(f"entry/{entry}/event/{h['event']}/picks/", snapshot_dir)
-            if gw_picks is not None:
-                picks += deadline_picks(entry, h["event"], gw_picks)
         chips += [{"entry_id": entry, "gw": c["event"], "chip": c["name"], "time": c["time"]} for c in history["chips"]]
         transfers += [{"entry_id": entry, "gw": t["event"], **t} for t in _latest(f"entry/{entry}/transfers/", snapshot_dir) or []]
 
@@ -461,6 +505,7 @@ def _main(argv=None):
     col.add_argument("--max-age-hours", type=float, default=12, help="re-download standings/history/transfers older than this")
     col.add_argument("--config", type=Path, default=CONFIG_PATH)
     col.add_argument("--no-transfers", action="store_true", help="skip transfers (not needed for EO): a quicker run")
+    col.add_argument("--squads", action="store_true", help="latest GW's picks only, 4 at a time: the quick weekly run")
     bld = sub.add_parser("build", help="rebuild the tables from saved snapshots (no downloads)")
     bld.add_argument("--config", type=Path, default=CONFIG_PATH)
     rep = sub.add_parser("report", help="write the top-N vs Elite 64 comparison to docs/research/")
@@ -482,7 +527,11 @@ def _main(argv=None):
     if args.top:  # quick test: just the top N
         config["overall_top"], config["sampled"] = [args.top], {}
     start = time.monotonic()
-    summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config, transfers=not args.no_transfers)
+    if args.squads:  # a few at a time, still at most 5 requests a second; retries back off if FPL objects
+        collector = Collector(api=PoliteApi(min_interval=0.2), max_age=timedelta(hours=args.max_age_hours))
+        summary = collector.collect(config, squads=True, workers=4)
+    else:
+        summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config, transfers=not args.no_transfers)
     print(f"Done in {(time.monotonic() - start) / 60:.1f} min: {summary}")
 
 

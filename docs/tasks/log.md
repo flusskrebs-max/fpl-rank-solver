@@ -154,3 +154,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   the squads are older than last GW. The two scheduled tasks were switched to headless on Alex's PC.
 - 2026-10-13: the page's update button and the launcher switch back to `main` (stashing uncommitted tracked changes)
   before pulling, instead of refusing on another branch; a Claude session on Alex's PC had left it on its own branch.
+- 2026-10-13, FS1b: `collect --squads` (the page button): standings plus each member's latest-GW picks only, 4 at a time at
+  most 5 requests a second; `build` now takes picks from saved snapshots even without a history. The full run took ~85 min
+  (history, transfers, every missing GW); the squads run is ~2,200 requests, about 5-10 min (estimate, not yet timed).

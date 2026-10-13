@@ -72,7 +72,9 @@ class FakeApi(FplApi):
     def get(self, endpoint, save=True):
         self.calls.append(endpoint)
         if endpoint not in PAYLOADS:
-            raise requests.HTTPError(f"404 for {endpoint}")
+            response = requests.Response()
+            response.status_code = 404
+            raise requests.HTTPError(f"404 for {endpoint}", response=response)
         self._save(endpoint, PAYLOADS[endpoint])
         return PAYLOADS[endpoint]
 
@@ -211,3 +213,17 @@ def test_rerun_without_transfers_skips_them(collected):
     assert not any("transfers" in c for c in collector.api.calls)
     transfers = pd.read_parquet(collector.out_dir / "transfers.parquet")  # the saved ones are kept
     assert transfers["element_in"].tolist() == [16]
+
+
+def test_squads_only_fetches_latest_picks_and_builds_without_history(tmp_path):
+    api = FakeApi(tmp_path / "snapshots")
+    collector = elite_picks.Collector(api=api, snapshot_dir=tmp_path / "snapshots", out_dir=tmp_path / "out", now=NOW, log=lambda *_: None)
+    config = {"season": "2026-27", "overall_top": [3], "named_lists": {}, "leagues": {}, "threshold_ranks": []}
+    summary = collector.collect(config, squads=True, workers=3)
+    assert summary["failed"] == []  # 103 has no GW2 team: a 404, skipped quietly
+    assert not any("history" in c or "transfers" in c or "live" in c for c in api.calls)
+    assert sorted(c for c in api.calls if "picks" in c) == [f"entry/{e}/event/2/picks/" for e in (101, 102, 103)]
+    picks = pd.read_parquet(collector.out_dir / "picks.parquet")
+    assert set(zip(picks["entry_id"], picks["gw"], strict=True)) == {(101, 2), (102, 2)}  # built with no history saved
+    eo = pd.read_parquet(collector.out_dir / "eo.parquet")
+    assert eo.loc[(eo["gw"] == 2) & (eo["fpl_id"] == 2), "eo"].item() == (1 + 3) / 2
