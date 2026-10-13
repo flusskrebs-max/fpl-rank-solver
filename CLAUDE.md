@@ -91,7 +91,7 @@ uv sync --group dev
 uv run pytest                 # all tests; -m "not slow" skips real solves
 uv run ruff check . && uv run ruff format .
 uv run python -m fplrank.data.projections register <file> [...]   # then: check-ids --fetch
-uv run python -m fplrank.collect.elite_picks collect [--top N]     # FPL API: Alex's PC only
+uv run python -m fplrank.collect.elite_picks collect [--scope picks] [--top N]  # FPL API: Alex's PC only
 uv run fplrank solve --team_id <id> --eo AE64 --target 10000 [--sims 50]  # his solve.py + λ choice (his flags pass through)
 ```
 

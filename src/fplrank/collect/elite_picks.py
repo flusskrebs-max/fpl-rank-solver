@@ -25,7 +25,7 @@ the GW1 picks of today's top 1000. `ranks` keeps each member's overall rank by G
 GW t" can be reconstructed later.
 
 CLI:
-    uv run python -m fplrank.collect.elite_picks collect [--top N] [--max-age-hours H]
+    uv run python -m fplrank.collect.elite_picks collect [--scope picks|history|full] [--top N] [--max-age-hours H]
     uv run python -m fplrank.collect.elite_picks build
     uv run python -m fplrank.collect.elite_picks report
     uv run python -m fplrank.collect.elite_picks cutoffs   # end-of-season rank cut-offs report
@@ -34,8 +34,10 @@ CLI:
 import argparse
 import json
 import math
+import threading
 import time
 import tomllib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from pathlib import Path
@@ -52,13 +54,16 @@ CONFIG_PATH = CONFIG_DIR / "manager_sets.toml"
 REPORT_PATH = PROJECT_ROOT / "docs" / "research" / "top1000-vs-elite64.md"
 CUTOFFS_PATH = PROJECT_ROOT / "docs" / "research" / "rank-cutoffs.md"
 STANDINGS_PAGE_SIZE = 50
+# What each manager's run fetches. picks: deadline squads for GWs not yet saved (all the EO options need);
+# history: also points, hits and ranks (the target line's drift, the spread check); full: also transfers (research).
+SCOPES = ("picks", "history", "full")
 _log = partial(print, flush=True)  # flush so progress shows up in redirected logs straight away
 
 
 class PoliteApi(FplApi):
-    """FplApi with a minimum gap between requests and retries with exponential backoff."""
+    """FplApi with a minimum gap between requests (shared by all threads) and retries with exponential backoff."""
 
-    def __init__(self, min_interval: float = 0.5, retries: int = 5, **kwargs):
+    def __init__(self, min_interval: float = 0.125, retries: int = 5, **kwargs):
         super().__init__(**kwargs)
         retry = Retry(
             total=retries,
@@ -70,14 +75,17 @@ class PoliteApi(FplApi):
         self.session.mount("https://", HTTPAdapter(max_retries=retry))
         self.min_interval = min_interval
         self.requests = 0
-        self._last = 0.0
+        self._next = 0.0
+        self._lock = threading.Lock()
 
     def get(self, endpoint: str, save: bool = True) -> dict | list:
-        wait = self._last + self.min_interval - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        self._last = time.monotonic()
-        self.requests += 1
+        with self._lock:  # book the next free slot, then wait for it outside the lock
+            now = time.monotonic()
+            start = max(now, self._next)
+            self._next = start + self.min_interval
+            self.requests += 1
+        if start > now:
+            time.sleep(start - now)
         return super().get(endpoint, save)
 
 
@@ -103,6 +111,7 @@ class Collector:
         max_age: timedelta = timedelta(hours=12),
         now: datetime | None = None,
         log=_log,
+        workers: int = 4,
     ):
         self.snapshot_dir = snapshot_dir
         self.api = api or PoliteApi(snapshot_dir=snapshot_dir)
@@ -110,6 +119,7 @@ class Collector:
         self.max_age = max_age
         self.now = now or datetime.now(UTC)
         self.log = log
+        self.workers = workers
 
     def fetch(self, endpoint: str, max_age: timedelta | None) -> dict | list:
         """Latest snapshot if it is recent enough (`max_age=None`: any snapshot will do), else download."""
@@ -152,10 +162,11 @@ class Collector:
         members["collected_at"] = self.now.isoformat(timespec="seconds")
         return members
 
-    def collect(self, config: dict, transfers: bool = True) -> dict:
-        """Download everything needed for `config`'s sets, then rebuild the tables. Returns a summary.
-        `transfers=False` leaves each manager's transfers as last saved: a third fewer requests, and the EO
-        forecast doesn't use them (the page's "Get the field's squads" button)."""
+    def collect(self, config: dict, scope: str = "full") -> dict:
+        """Download what `scope` (see SCOPES) needs for `config`'s sets, then rebuild the tables. Returns a summary.
+        Whatever a narrower scope skips is kept as last saved. `workers` managers are fetched side by side."""
+        if scope not in SCOPES:
+            raise ValueError(f"scope must be one of {SCOPES}, not {scope!r}")
         bootstrap = self.fetch("bootstrap-static/", self.max_age)
         self.fetch("fixtures/", self.max_age)
         started = {e["id"]: e for e in bootstrap["events"] if datetime.fromisoformat(e["deadline_time"]) <= self.now}
@@ -166,25 +177,59 @@ class Collector:
         entries = members["entry_id"].unique().tolist()
         self.log(f"{len(entries)} managers, GW{min(started)}-{max(started)}")
         failed = []
-        for i, entry in enumerate(entries, 1):
-            try:
-                history = self.fetch(f"entry/{entry}/history/", self.max_age)
-                if transfers:
-                    self.fetch(f"entry/{entry}/transfers/", self.max_age)
-                for gw in (h["event"] for h in history["current"] if h["event"] in started):
-                    self.fetch(f"entry/{entry}/event/{gw}/picks/", None)
-            except requests.HTTPError as err:
-                failed.append(entry)
-                self.log(f"  entry {entry}: {err}")
-            if i % 50 == 0 or i == len(entries):
-                self.log(f"  {i}/{len(entries)} managers done ({getattr(self.api, 'requests', '?')} requests so far)")
+        with ThreadPoolExecutor(max_workers=max(1, self.workers)) as pool:
+            jobs = {pool.submit(self._collect_entry, entry, started, scope): entry for entry in entries}
+            for i, job in enumerate(as_completed(jobs), 1):
+                try:
+                    job.result()
+                except requests.HTTPError as err:
+                    failed.append(jobs[job])
+                    self.log(f"  entry {jobs[job]}: {err}")
+                if i % 50 == 0 or i == len(entries):
+                    self.log(f"  {i}/{len(entries)} managers done ({getattr(self.api, 'requests', '?')} requests so far)")
+        failed.sort()
         for gw, event in started.items():
             self.fetch(f"event/{gw}/live/", None if event["finished"] else self.max_age)
         for rank in config.get("threshold_ranks", []):  # T_X(now): the standings page holding rank X
             self.fetch(_standings_endpoint(_page_for(rank)), self.max_age)
 
-        tables = build(config["season"], self.out_dir, self.snapshot_dir, config.get("threshold_ranks", []))
-        return {"managers": len(entries), "failed": failed, "gws": sorted(started), "rows": {k: len(v) for k, v in tables.items()}}
+        tables = build(config["season"], self.out_dir, self.snapshot_dir, config.get("threshold_ranks", []), self.now)
+        return {
+            "scope": scope,
+            "managers": len(entries),
+            "failed": failed,
+            "gws": sorted(started),
+            "rows": {k: len(v) for k, v in tables.items()},
+        }
+
+    def _collect_entry(self, entry: int, started: dict, scope: str) -> None:
+        """One manager's downloads for `scope`.
+
+        The picks scope never fetches history. With a saved one, it tries every started GW from the manager's
+        first without saved picks (a GW the manager missed is a 404, and skipped). A manager new to the sets gets
+        the latest GW only (and the one before, if the latest is a free hit, which EO reverts), not the season.
+        """
+        saved = _latest(f"entry/{entry}/history/", self.snapshot_dir)
+        if scope == "picks" and saved is None:
+            latest = max(started)
+            if self.fetch(f"entry/{entry}/event/{latest}/picks/", None)["active_chip"] == "freehit" and latest - 1 in started:
+                gws = [latest - 1]
+            else:
+                return
+        elif scope == "picks":
+            played = [h["event"] for h in saved["current"]]
+            gws = [gw for gw in started if not played or gw >= min(played)]
+        else:
+            history = self.fetch(f"entry/{entry}/history/", self.max_age)
+            gws = [h["event"] for h in history["current"] if h["event"] in started]
+            if scope == "full":
+                self.fetch(f"entry/{entry}/transfers/", self.max_age)
+        for gw in gws:
+            try:
+                self.fetch(f"entry/{entry}/event/{gw}/picks/", None)
+            except requests.HTTPError as err:
+                if scope != "picks" or getattr(err.response, "status_code", 404) != 404:
+                    raise
 
 
 def _standings_endpoint(page: int, league: int = 314) -> str:
@@ -248,14 +293,23 @@ def season_cutoffs(past: pd.DataFrame, ranks=(100, 1_000, 10_000, 100_000)) -> p
     return pd.DataFrame(rows).reindex(columns=cols)
 
 
-def build(season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPSHOT_DIR, threshold_ranks=()) -> dict[str, pd.DataFrame]:
+def build(
+    season: str, out_dir: Path = COLLECTED_DIR, snapshot_dir: Path = SNAPSHOT_DIR, threshold_ranks=(), now: datetime | None = None
+) -> dict[str, pd.DataFrame]:
     """Rebuild the tables from the latest snapshots of every member's endpoints (and all standings snapshots)."""
     members = pd.read_parquet(out_dir / "members.parquet")
+    bootstrap = _latest("bootstrap-static/", snapshot_dir)
+    now = now or datetime.now(UTC)
+    started = [e["id"] for e in bootstrap["events"] if datetime.fromisoformat(e["deadline_time"]) <= now] if bootstrap else []
     picks, chips, transfers, ranks, past = [], [], [], [], []
     for entry in members["entry_id"].unique().tolist():
-        history = _latest(f"entry/{entry}/history/", snapshot_dir)
-        if history is None:
-            continue
+        # No history yet: a manager new to the sets, with only the picks scope's latest squads
+        history = _latest(f"entry/{entry}/history/", snapshot_dir) or {"current": [], "past": [], "chips": []}
+        last = max((h["event"] for h in history["current"]), default=0)
+        for gw in (g for g in started if g > last):  # picks fetched since the history was saved (picks scope)
+            gw_picks = _latest(f"entry/{entry}/event/{gw}/picks/", snapshot_dir)
+            if gw_picks is not None:
+                picks += deadline_picks(entry, gw, gw_picks)
         past += [
             {"season": p["season_name"].replace("/", "-"), "entry_id": entry, "total_points": p["total_points"], "rank": p["rank"]}
             for p in history["past"]
@@ -460,7 +514,15 @@ def _main(argv=None):
     col.add_argument("--top", type=int, help="override overall_top with a single N (e.g. 20 for a quick test)")
     col.add_argument("--max-age-hours", type=float, default=12, help="re-download standings/history/transfers older than this")
     col.add_argument("--config", type=Path, default=CONFIG_PATH)
-    col.add_argument("--no-transfers", action="store_true", help="skip transfers (not needed for EO): a quicker run")
+    col.add_argument(
+        "--scope",
+        choices=SCOPES,
+        default="full",
+        help="picks: new squads only (all the EO options need; quickest); history: also points and ranks; full: also transfers",
+    )
+    col.add_argument("--no-transfers", action="store_const", const="history", dest="scope", help="same as --scope history")
+    col.add_argument("--workers", type=int, default=4, help="managers fetched side by side")
+    col.add_argument("--rate", type=float, default=8, help="most requests per second, over all workers")
     bld = sub.add_parser("build", help="rebuild the tables from saved snapshots (no downloads)")
     bld.add_argument("--config", type=Path, default=CONFIG_PATH)
     rep = sub.add_parser("report", help="write the top-N vs Elite 64 comparison to docs/research/")
@@ -482,7 +544,8 @@ def _main(argv=None):
     if args.top:  # quick test: just the top N
         config["overall_top"], config["sampled"] = [args.top], {}
     start = time.monotonic()
-    summary = Collector(max_age=timedelta(hours=args.max_age_hours)).collect(config, transfers=not args.no_transfers)
+    api = PoliteApi(min_interval=1 / args.rate)
+    summary = Collector(api=api, max_age=timedelta(hours=args.max_age_hours), workers=args.workers).collect(config, scope=args.scope)
     print(f"Done in {(time.monotonic() - start) / 60:.1f} min: {summary}")
 
 

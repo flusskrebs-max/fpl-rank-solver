@@ -206,8 +206,54 @@ def test_rerun_without_transfers_skips_them(collected):
     collector, config, _ = collected
     collector.now = NOW + timedelta(hours=13)
     collector.api.calls.clear()
-    collector.collect(config, transfers=False)
+    collector.collect(config, scope="history")
     assert "entry/101/history/" in collector.api.calls
     assert not any("transfers" in c for c in collector.api.calls)
     transfers = pd.read_parquet(collector.out_dir / "transfers.parquet")  # the saved ones are kept
     assert transfers["element_in"].tolist() == [16]
+
+
+def test_picks_scope_fetches_only_new_squads(collected, monkeypatch):
+    collector, config, _ = collected
+    monkeypatch.setitem(PAYLOADS, "entry/101/event/3/picks/", _picks(captain=5))  # 102 missed GW3: a 404, skipped
+    monkeypatch.setitem(PAYLOADS, "event/3/live/", {})
+    collector.now = NOW + timedelta(days=6)  # GW3's deadline has passed; the saved history only reaches GW2
+    collector.api.calls.clear()
+    summary = collector.collect(config, scope="picks")
+    member_calls = [c for c in collector.api.calls if c.startswith("entry/")]
+    assert sorted(member_calls) == ["entry/101/event/3/picks/", "entry/102/event/3/picks/", "entry/103/event/3/picks/"]
+    assert summary["failed"] == [103]  # new to the sets (no saved history): latest GW only, and not found
+    picks = pd.read_parquet(collector.out_dir / "picks.parquet")
+    gw3 = picks[picks["gw"] == 3]
+    assert gw3["entry_id"].unique().tolist() == [101] and gw3.loc[gw3["is_captain"], "fpl_id"].tolist() == [5]
+    assert pd.read_parquet(collector.out_dir / "transfers.parquet")["element_in"].tolist() == [16]  # kept
+
+
+def test_polite_api_spaces_requests_across_threads(monkeypatch, tmp_path):
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    times = []
+    monkeypatch.setattr(FplApi, "get", lambda self, endpoint, save=True: times.append(time.monotonic()))
+    api = elite_picks.PoliteApi(min_interval=0.05, snapshot_dir=tmp_path)
+    with ThreadPoolExecutor(4) as pool:
+        list(pool.map(lambda i: api.get(f"x/{i}/"), range(8)))
+    gaps = [b - a for a, b in zip(sorted(times)[:-1], sorted(times)[1:], strict=True)]
+    assert api.requests == 8 and min(gaps) > 0.04
+
+
+def test_picks_scope_gets_a_new_managers_latest_squad_only(tmp_path, monkeypatch):
+    monkeypatch.setitem(PAYLOADS, "entry/104/event/2/picks/", _picks(captain=7, chip="freehit"))
+    monkeypatch.setitem(PAYLOADS, "entry/104/event/1/picks/", _picks(captain=8))  # the squad the free hit reverts to
+    api = FakeApi(tmp_path / "snapshots")
+    collector = elite_picks.Collector(api=api, snapshot_dir=tmp_path / "snapshots", out_dir=tmp_path / "out", now=NOW, log=lambda *_: None)
+    config = {"season": "2026-27", "overall_top": [], "named_lists": {"new": [101, 104]}, "threshold_ranks": []}
+    summary = collector.collect(config, scope="picks")
+    assert summary["failed"] == []
+    assert sorted(c for c in api.calls if c.startswith("entry/")) == [
+        "entry/101/event/2/picks/",
+        "entry/104/event/1/picks/",
+        "entry/104/event/2/picks/",
+    ]
+    picks = pd.read_parquet(collector.out_dir / "picks.parquet")
+    assert sorted(set(zip(picks["entry_id"], picks["gw"], strict=True))) == [(101, 2), (104, 1), (104, 2)]

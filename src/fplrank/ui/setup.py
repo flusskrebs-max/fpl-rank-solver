@@ -147,7 +147,7 @@ def age(path: Path) -> str | None:
 
 SQUAD_SETS = ("AE64", "E64", "top1000", "top10k")
 # what the page's button runs: the collector without transfers (the EO forecast doesn't use them)
-COLLECT = ("fplrank.collect.elite_picks", "collect", "--no-transfers")
+COLLECT = ("fplrank.collect.elite_picks", "collect", "--scope", "picks")
 
 
 def last_deadline(snapshot_dir: Path = SNAPSHOT_DIR, now: datetime | None = None) -> int | None:

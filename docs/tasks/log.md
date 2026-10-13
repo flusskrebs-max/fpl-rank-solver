@@ -154,3 +154,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   the squads are older than last GW. The two scheduled tasks were switched to headless on Alex's PC.
 - 2026-10-13: the page's update button and the launcher switch back to `main` (stashing uncommitted tracked changes)
   before pulling, instead of refusing on another branch; a Claude session on Alex's PC had left it on its own branch.
+- 2026-10-13, collector speed: `collect --scope picks|history|full`. Picks (the page button, Friday task) fetches only new squads,
+  latest GW only for managers new to the sets; history (Tuesday task) adds points/ranks; full adds transfers. 4 workers,
+  8 requests/s shared. Measured 11.6 min (5,263 requests) for GW6 vs about 85 min before.
