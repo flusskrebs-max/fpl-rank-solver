@@ -40,11 +40,15 @@ and has a "Get the field's squads" button (`collect --no-transfers`), and `fplra
 "fplrank collect (Tue)", 20:00), with catch-up after a missed start. A test run from Task Scheduler
 succeeded.
 
+**Update (2026-10-13):** the tasks now start the script through `conhost.exe --headless`, so no
+console window opens. On 2026-10-09 the Friday run's window was closed seconds after it opened
+(result 0xC000013A, `^C` in the log) and nothing was collected.
+
 To recreate them (e.g. after moving the repo), run this in PowerShell:
 
 ```powershell
 $repo = "C:\Users\Alex\Documents\fpl-rank-solver"
-$action = New-ScheduledTaskAction -Execute "$repo\scripts\collect_elite.cmd" -WorkingDirectory $repo
+$action = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless `"$repo\scripts\collect_elite.cmd`"" -WorkingDirectory $repo
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew
 foreach ($day in "Friday", "Tuesday") {
   $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $day -At "20:00"
