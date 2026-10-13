@@ -148,3 +148,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, EOP: Alex dropped scraping Solio's EO. `fplrank.data.eo_paste` builds the `--eo solio` file (Solio's layout
   plus an `ID` column, which `load_solio_eo` now uses) from an EO table such as the GW6 top-10k CSV: chip-free EO
   carried forward to GW38, unlisted 0.1%. The setup box takes the table from Downloads, the drop box or a paste.
+- 2026-10-13, collector: the 9 Oct Friday run was killed when its console window closed (0xC000013A); data stopped at GW5.
+  Both scheduled tasks now run the script through `conhost.exe --headless` (no window); docs/collect-schedule.md updated.
