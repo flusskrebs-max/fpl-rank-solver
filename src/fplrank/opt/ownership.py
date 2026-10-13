@@ -42,7 +42,8 @@ _PTS = re.compile(r"^(\d+)_Pts$")
 def load_solio_eo(bootstrap: dict, path=None) -> pd.DataFrame:
     """Solio's EO forecast (`Name, Team, Price, Avg EO %, GW6 EO %, ...`) as fpl_id x GW (fraction).
 
-    The export has no FPL ids, so players are matched on web name (accents ignored) and team. Default
+    Solio's export has no FPL ids, so players are matched on web name (accents ignored) and team; a file built
+    from a pasted EO table (`fplrank.data.eo_paste`) has an `ID` column, used as it is. Default
     path: the newest file in data/projections/solio_eo/ (paid data, never committed).
     """
     import unicodedata
@@ -58,9 +59,12 @@ def load_solio_eo(bootstrap: dict, path=None) -> pd.DataFrame:
             raise FileNotFoundError(f"No Solio EO export in {PROJECTIONS_DIR / 'solio_eo'}")
         path = files[-1]
     raw = pd.read_csv(path, encoding="utf-8-sig")
-    teams = {t["id"]: t["short_name"] for t in bootstrap["teams"]}
-    ids = {(norm(e["web_name"]), teams[e["team"]]): e["id"] for e in bootstrap["elements"]}
-    raw["fpl_id"] = [ids.get((norm(n), t)) for n, t in zip(raw["Name"], raw["Team"], strict=True)]
+    if "ID" in raw:  # a file built by fplrank.data.eo_paste carries the ids
+        raw["fpl_id"] = raw["ID"].where(raw["ID"].isin({e["id"] for e in bootstrap["elements"]}))
+    else:
+        teams = {t["id"]: t["short_name"] for t in bootstrap["teams"]}
+        ids = {(norm(e["web_name"]), teams[e["team"]]): e["id"] for e in bootstrap["elements"]}
+        raw["fpl_id"] = [ids.get((norm(n), t)) for n, t in zip(raw["Name"], raw["Team"], strict=True)]
     if missing := raw.loc[raw["fpl_id"].isna(), "Name"].tolist():
         print(f"Solio EO: {len(missing)} players not matched to FPL ids, left out: {missing[:10]}")
     gw_cols = {c: int(c[2:].split()[0]) for c in raw.columns if c.startswith("GW") and c.endswith("EO %")}

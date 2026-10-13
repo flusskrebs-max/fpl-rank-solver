@@ -254,6 +254,7 @@ def weekly_setup() -> None:
         solio.caption(
             f"Projections: {f'saved {projections_age}' if projections_age else 'none yet'}."
             f" EO forecast: {f'{eo_files[-1].name}' if eo_files else 'none yet (only needed for EO from solio)'}."
+            " An EO table (last GW's EO, such as the top 10k CSV) is turned into the EO forecast."
         )
         found = setup.newest_downloads()
         if solio.button("Use the newest from Downloads", disabled=not found, help=f"Looks in {setup.DOWNLOADS}"):
@@ -267,15 +268,29 @@ def weekly_setup() -> None:
         if dropped and solio.button("Save dropped files"):
             st.session_state["setup_msg"] = [install(f.getvalue(), f.name) for f in dropped]
             st.rerun()
+        table = solio.text_area(
+            "Or paste an EO table",
+            height=68,
+            placeholder="Player,Team,EOTop10k,...",
+            key=f"eo_paste_{st.session_state.get('eo_pastes', 0)}",  # a new key empties the box after a build
+        )
+        if solio.button("Build EO forecast", disabled=not table.strip()):
+            st.session_state["setup_msg"] = [install(table.encode("utf-8"), "the pasted table")]
+            st.session_state["eo_pastes"] = st.session_state.get("eo_pastes", 0) + 1
+            st.rerun()
 
 
 def install(data: bytes, name: str) -> tuple[str, str]:
     try:
-        kind, gws, dest = setup.install(data)
-    except ValueError as e:
+        kind, gws, dest, note = setup.install(data)
+    except (ValueError, OSError) as e:  # OSError: no FPL bootstrap for an EO table (API down, no snapshot)
         return "error", f"{name}: {e}"
-    what = "Projections" if kind == "projections" else "EO forecast"
     span = f"GW{min(gws)}" + (f"-{max(gws)}" if max(gws) > min(gws) else "")
+    if kind == "eo table":
+        return (
+            "warning" if note else "success"
+        ), f"EO forecast for {span} built from {name} (as {dest.name}, last GW's EO carried forward)." + (f" {note}." if note else "")
+    what = "Projections" if kind == "projections" else "EO forecast"
     return "success", f"{what} for {span} saved from {name} (as {dest.name})."
 
 

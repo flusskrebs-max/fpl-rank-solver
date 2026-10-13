@@ -145,3 +145,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   main, `uv sync`, open the page) plus a desktop shortcut (weekly-run.md). `.gitattributes` keeps .cmd files CRLF.
   Then a setup box on the page (`ui/setup.py`): git pull button, paste-and-save for the bookmarklet team, Solio
   files from Downloads told apart by their columns (EO named by its first GW). Clicked through in a headless browser.
+- 2026-10-13, EOP: Alex dropped scraping Solio's EO. `fplrank.data.eo_paste` builds the `--eo solio` file (Solio's layout
+  plus an `ID` column, which `load_solio_eo` now uses) from an EO table such as the GW6 top-10k CSV: chip-free EO
+  carried forward to GW38, unlisted 0.1%. The setup box takes the table from Downloads, the drop box or a paste.

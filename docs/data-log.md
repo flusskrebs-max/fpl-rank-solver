@@ -3,6 +3,14 @@
 What data we have, where it lives, and first observations. Newest first. Maintained in the repo by
 Claude Code (PM + developer) since 2026-10-06; earlier entries were written by the Cowork PM.
 
+## 2026-10-13: EO file from a pasted EO table (replaces Solio's EO export)
+
+- Alex's GW6 top-10k EO CSV (LiveFPL layout: `Player,Team,EOTop10k,CTop10k,TcTop10k,EO_overall,...`, 77 rows down to
+  0.69%, full team names) matches FPL ids on web name + team for all 77 rows. `fplrank.data.eo_paste` turns such a
+  table into the `--eo solio` file: last GW's EO minus triple captains, carried to every GW to GW38, unlisted 0.1%.
+- Persistence is the simple choice, not the best: GW6 top 10k, mean error 6.2 EO points a player vs 7.8 for Solio's
+  forecast and 4.7 for the collector's re-pick (`--eo top10k`).
+
 ## 2026-10-06: Solio EO forecast (GW6-24)
 
 - Alex's Solio "effective ownership" export (`data/projections/solio_eo/`, paid, never committed):
