@@ -29,7 +29,7 @@ The box at the top of the page does steps 1 to 3 with buttons, plus the field's 
 
 - **Field's squads**: what the EO forecast is built from (every AE64 and E64 manager, the top 1000 and a top-10k
   sample, from FPL). The box shows which GW they are from and turns yellow when a newer GW has started; then press
-  "Get the field's squads" before solving (about half an hour; it carries on where it stopped if interrupted). The
+  "Get the field's squads" before solving (about 5-10 minutes: only the latest GW's squads; it carries on where it stopped if interrupted). The
   solve also prints a WARNING if the squads are older than last GW. The scheduled runs (`docs/collect-schedule.md`)
   usually keep them up to date, but only when the PC is on at 20:00.
 

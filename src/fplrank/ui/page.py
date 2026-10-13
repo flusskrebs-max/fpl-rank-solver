@@ -286,7 +286,7 @@ def weekly_setup() -> None:
         behind, text = setup.squads_summary(setup.squads_gw(), setup.last_deadline())
         field.caption(
             "Every AE64 and E64 manager's squad, the top 1000 and a top-10k sample, from FPL: what the EO forecast is"
-            " built from. Fetching a new GW takes about half an hour."
+            " built from. Fetching a new GW takes about 5-10 minutes."
         )
         (field.warning if behind else field.caption)(text)
         if field.button("Get the field's squads", type="primary" if behind else "secondary"):

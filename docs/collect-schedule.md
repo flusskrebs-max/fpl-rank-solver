@@ -31,7 +31,8 @@ standings pages plus one GW of picks for each manager, roughly 10 extra minutes.
 
 **Status (2026-10-13):** the Friday 9 Oct run was closed by hand 8 s in (its console window), so the squads stalled at
 GW5. Both tasks now run headless. If the PC is off or a run fails, the page's setup box shows the squads are behind
-and has a "Get the field's squads" button (`collect --no-transfers`), and `fplrank solve` prints a warning.
+and has a "Get the field's squads" button (`collect --squads`: latest GW picks only, 4 at a time, about 5-10 minutes), and `fplrank solve` prints a warning.
+The scheduled runs stay full (history and transfers, for research).
 
 `scripts/collect_elite.cmd` runs the collector from the repo folder and appends to
 `data/collected/logs/collect.log`.
