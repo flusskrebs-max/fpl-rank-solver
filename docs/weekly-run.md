@@ -19,6 +19,12 @@ The box at the top of the page does steps 1 to 3 with buttons, so no PowerShell 
 - **Solio files**: export both files from Solio to Downloads, then "Use the newest from Downloads". The page tells the
   projections and the EO forecast apart by their columns (not their names), so `projection (9).csv` is fine, and
   names the EO file by its first GW. Files older than a week are ignored. Or drag them onto the drop box.
+- **EO forecast from an EO table** (in place of Solio's EO export): download or copy last GW's EO table (e.g. the
+  top 10k CSV, `Player,Team,EOTop10k,...`) and use it the same way: from Downloads, the drop box, or paste it into
+  "Or paste an EO table" and press "Build EO forecast". The page carries that EO forward to every GW from next GW
+  (triple captains counted once; players not listed 0.1%) and saves it where `--eo solio` reads it. It names any row
+  it couldn't match to a player. Needs the FPL API (or a saved bootstrap) to match names. Only needed for `--eo solio`:
+  `--eo AE64`, `top10k` and the rest come from the collector and need no file.
 
 To put it on your desktop, run this once in PowerShell from the repo folder:
 
@@ -51,7 +57,11 @@ Copy-Item "$HOME\Downloads\solio_effective_ownership.csv" "data\projections\soli
 
 Change `(9)` and `GW07` to match. `solio.csv` is the file his solver reads (his `datasource` is
 `solio`). Both locations are git-ignored, so paid data is never uploaded. The EO file is only needed
-for `--eo solio`.
+for `--eo solio`. To build it from an EO table instead:
+
+```powershell
+uv run python -m fplrank.data.eo_paste "$HOME\Downloads\top10k_eo.csv"
+```
 
 ## 3. Load your team
 

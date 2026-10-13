@@ -1,15 +1,19 @@
 """The page's weekly setup: Solio files told apart by their columns and put where they are read, the team saved."""
 
+import gzip
 import json
 import os
 import time
 from datetime import date
+from pathlib import Path
 
 import pytest
 
 from fplrank.ui import setup
 
 PROJ = "Pos,ID,Name,BV,SV,Team,8_xMins,9_xMins,8_Pts,9_Pts\nG,1,Keeper,4.5,4.5,Alpha FC,90,90,3.5,3.8\n"
+TABLE = "Player,Team,EOTop10k\nHaaland,Man City,123.28%\nTypo,Man City,5%\n"
+BOOTSTRAP = Path(__file__).parent / "fixtures" / "gw6_live" / "bootstrap-static.json.gz"
 EO = "\ufeffName,Team,Price,Avg EO %,GW8 EO %,GW9 EO %\nSalah,LIV,14.5,80,90,70\n"
 
 
@@ -24,14 +28,21 @@ def dirs(tmp_path, monkeypatch):
 def test_kinds():
     assert setup.csv_kind(PROJ.splitlines()[0]) == ("projections", [8, 9])
     assert setup.csv_kind(EO.splitlines()[0]) == ("eo", [8, 9])
+    assert setup.csv_kind("Player,Team,EOTop10k,CTop10k") == ("eo table", [])
+    assert setup.csv_kind("Player\tTeam\tEO") == ("eo table", [])
     assert setup.csv_kind("a,b,c") is None
 
 
 def test_install(dirs):
     assert setup.install(PROJ.encode())[2] == setup.SOLIO_CSV
     assert setup.SOLIO_CSV.read_text() == PROJ
-    kind, _, dest = setup.install(EO.encode("utf-8"), today=date(2026, 10, 13))
+    kind, _, dest, _ = setup.install(EO.encode("utf-8"), today=date(2026, 10, 13))
     assert (kind, dest.name) == ("eo", "EO_GW08_20261013.csv")
+    boot = json.loads(gzip.open(BOOTSTRAP).read())
+    kind, gws, dest, note = setup.install(TABLE.encode("utf-8"), today=date(2026, 10, 13), bootstrap=boot)
+    assert (kind, gws[0], gws[-1], dest.name) == ("eo table", 6, 38, "EO_GW06_20261013.csv")
+    assert setup.file_kind(dest) == ("eo", gws)
+    assert note == "not matched, left out: Typo (Man City)"
     with pytest.raises(ValueError):
         setup.install(b"x,y\n1,2\n")
 
@@ -41,6 +52,8 @@ def test_newest_downloads(tmp_path):
     (tmp_path / "projection (9).csv").write_text(PROJ)
     (tmp_path / "solio_effective_ownership.csv").write_text(EO, encoding="utf-8")
     (tmp_path / "other.csv").write_text("a,b\n")
+    (tmp_path / "top10k.csv").write_text(TABLE, encoding="utf-8")  # an EO table: the same slot as Solio's EO
+    os.utime(tmp_path / "top10k.csv", (time.time() - 3600,) * 2)
     old = time.time() - 30 * 86400
     os.utime(tmp_path / "projection (8).csv", (old, old))
     found = setup.newest_downloads(tmp_path)

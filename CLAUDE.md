@@ -59,6 +59,8 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   unlisted EO = censored, not zero),
   `projections.py` (Solio exports → long `vintage_gw, gw, fpl_id, ... xmins, xpts`; registry of
   files in `data/projections/`; `latest(gw)` = newest file made at or before a GW).
+- `src/fplrank/data/eo_paste.py`: the `--eo solio` EO file built from an EO table Alex pastes (e.g. LiveFPL top 10k),
+  last GW's EO carried forward; replaces scraping Solio's EO. The setup box takes it like a Solio file.
 - `src/fplrank/collect/elite_picks.py`: collects picks/chips/transfers/ranks for the manager sets in
   `config/manager_sets.toml` (default top 1000) into `data/collected/*.parquet`, plus deadline EO in
   the B01 long shape (deadline EO with chips; `opt.ownership.chip_free_eo` takes them out for `--eo`). Resumable from snapshots; scheduled on Alex's PC (`docs/collect-schedule.md`).

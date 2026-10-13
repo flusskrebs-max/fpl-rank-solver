@@ -24,6 +24,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 | EOL | Later-GW EO drifts towards three wildcard solves on last season's drift curve; captain split evened out further ahead (`--eo_drift`) | (none; `docs/research/eo-horizon.md`) | DONE (PR #45) |
 | Ship v0.3 | Logged real-deadline run of `fplrank solve --target` (replaces the v0.1 and v0.2 ship runs) | (none) | TODO |
 | CLI 5 | One-page local Streamlit app that only fills in `fplrank solve` flags (`uv run fplrank page`) | (none) | IN REVIEW (PR #46) |
+| EOP | `--eo solio` file built from a pasted/downloaded EO table (e.g. top 10k CSV), last GW's EO carried forward, in the setup box; no more scraping Solio's EO (Alex, 2026-10-13) | (none) | IN REVIEW |
 | CLI 6 | Double-click Windows launcher (`scripts/fplrank_page.cmd`, desktop shortcut) and a weekly setup box on the page: latest code, bookmarklet team, Solio files from Downloads (Alex, 2026-10-13) | (none) | IN REVIEW |
 
 ## v0.4 Better EO
