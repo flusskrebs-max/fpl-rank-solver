@@ -39,10 +39,15 @@ STEP = 0.05  # weight grid
 OUT_DIR = DATA_DIR / "derived" / "eo_blend"
 # Captain herding (`herd_captains`), set from 2025-26's pattern before scoring 2026-27 (eo-blend.md). HERD_CONC:
 # median top-captain share per group (eo-patterns-2025-26.md §5); groups not listed (top 1k/10k herd much less) are
-# not herded. HERD_TAU: a 0.5-point xP lead gives the top captain 84% of the herd, a 1-point lead 97%.
+# not herded. HERD_TAU: softmax temperature over the candidates' xP (two candidates: a 0.5-point lead gives the top one
+# 84% of the herd, a 1-point lead 97%).
 HERD_CONC = {"AE64": 0.97, "E64": 0.91}
 HERD_TAU = 0.3
 HERD_MIN_XI = 0.25  # captain candidates: in at least a quarter of the group's XIs
+# HERD_RHO: weight on last GW's captain shares. 0: on 2026-27 GW2-6 (leave one GW out) neither a softer τ nor any
+# weight on it beat the current rule; 0.6 would have fixed GW6 (Haaland) but costs more in GW2-5, where the captain moved.
+HERD_RHO = 0.0
+HERD_PREV_MIN = 0.05  # last GW's captains kept in the mix: at least 5% of the group
 
 
 # ---------------------------------------------------------------------------- inputs (a) and (b)
@@ -98,65 +103,83 @@ def next_gw_eo(picks: pd.DataFrame, gw: int, xp: pd.Series, conc: float | None =
     armband herded (`herd_captains`). `picks` holds one group's managers only.
     """
     last = int(picks.loc[picks["gw"] < gw, "gw"].max())
-    rows = repick_rows(fair_rows(picks, last), xp)
+    fair = fair_rows(picks, last)
+    rows = repick_rows(fair, xp)
     if conc is not None:
-        rows = herd_captains(rows, xp, conc)
+        rows = herd_captains(rows, xp, conc, prev=captain_shares(fair))
     eo = rows.groupby("fpl_id")["multiplier"].sum() / rows["entry_id"].nunique()
     return eo[eo > 0].rename("eo"), last
 
 
 def herd_captains(
-    rows: pd.DataFrame, xp: pd.Series, conc: float = 0.94, tau: float = HERD_TAU, min_xi: float = HERD_MIN_XI, q_shrink: float = 0.0
+    rows: pd.DataFrame,
+    xp: pd.Series,
+    conc: float = 0.94,
+    tau: float = HERD_TAU,
+    min_xi: float = HERD_MIN_XI,
+    q_shrink: float = 0.0,
+    prev: pd.Series | None = None,
+    rho: float = HERD_RHO,
 ) -> pd.DataFrame:
-    """(b) with the armband herded onto the group's consensus captain (eo-patterns-2025-26.md §5).
+    """(b) with the armband herded onto the group's consensus captains (eo-patterns-2025-26.md §5, eo-blend.md).
 
-    The elite concentrate the armband far harder than "everyone captains their own highest xP": in 2025-26 one
-    captain took 97% (AE64) and 91% (E64) of the armbands in a median week, splitting only when the top two
-    premiums were close, and managers who don't own him buy him. So: candidates are the players in at least
-    `min_xi` of the group's re-picked XIs, c1 and c2 the two with the highest xP, q = 1 / (1 + exp(-(xP1 - xP2) /
-    tau)). Every manager's armband goes conc x q to c1, conc x (1 - q) to c2 and 1 - conc to their own re-picked
-    captain. A manager who doesn't start c1 (or c2) buys him with that probability, starting him in place of
-    their lowest-xP starter in his position. Multipliers are expected ones, so they can be fractional; `captain`
-    is the expected armband. `q_shrink` pulls q towards 0.5 (1: an even split), for GWs further ahead, where the
+    The elite concentrate the armband far harder than "everyone captains their own highest xP", and managers who
+    don't own the consensus captain buy him; but when several premiums are close the field splits, and not in one
+    projection's order (GW6 2026-27: four captains within a point, AE64 42/27/20/9). So: candidates are the players
+    in at least `min_xi` of the group's re-picked XIs, each weighted softmax(xP / `tau`), mixed with last GW's
+    captain shares `prev` (fpl_id -> share of the group) at weight `rho`: captaincy is sticky. Every manager's
+    armband goes conc x p_c to each target c and 1 - conc to their own re-picked captain. A manager who doesn't
+    start c buys (or starts) him with that probability, in place of their lowest-xP starter in his position.
+    Multipliers are expected ones, so they can be fractional; `captain` is the expected armband. `q_shrink` pulls
+    the split towards even between the two highest-xP candidates (1: 50/50), for GWs further ahead, where the
     projected top captain is less certain to be the field's.
     """
+    n = rows["entry_id"].nunique()
     xi = rows[rows["multiplier"] >= 1]
-    share = xi.groupby("fpl_id")["entry_id"].nunique() / rows["entry_id"].nunique()
+    share = xi.groupby("fpl_id")["entry_id"].nunique() / n
     x = xp.reindex(share.index[share >= min_xi]).fillna(0.0).sort_values(ascending=False, kind="stable")
     if len(x) < 2:
         return rows
-    q = 1 / (1 + np.exp(-(x.iloc[0] - x.iloc[1]) / tau))
-    q = 0.5 + (q - 0.5) * (1 - q_shrink)
+    p = np.exp((x - x.iloc[0]) / tau)
+    p = p / p.sum()
+    if q_shrink:
+        even = pd.Series(0.0, index=x.index)
+        even.iloc[:2] = 0.5
+        p = (1 - q_shrink) * p + q_shrink * even
+    if prev is not None and rho:
+        prev = prev[prev >= HERD_PREV_MIN]
+        if prev.sum() > 0:
+            p = ((1 - rho) * p).add(rho * prev / prev.sum(), fill_value=0.0)
+    p = p[p * conc >= 1e-3]
+    p = p / p.sum()
     pos = rows.drop_duplicates("fpl_id").set_index("fpl_id")["element_type"]
-    out = []
-    for _, r in rows.groupby("entry_id", sort=False):
-        m = r.set_index("fpl_id")["multiplier"].astype(float)
-        typ = r.set_index("fpl_id")["element_type"]
-        cap = (m >= 2) * (1 - conc)
-        m = m.clip(upper=1) + cap
-        for c, a in ((x.index[0], conc * q), (x.index[1], conc * (1 - q))):
-            if m.get(c, 0) < 1:  # buy (or start) him in place of the weakest starter in his position
-                if c not in m:
-                    m[c], typ[c], cap[c] = 0.0, pos[c], 0.0
-                same = m.index[(typ == pos[c]) & (m >= 1) & (m.index != c)]
-                if len(same):
-                    m[xp.reindex(same).fillna(0.0).idxmin()] -= a
-                m[c] += a
-            m[c] += a
-            cap[c] += a
-        ids = m.index
-        out.append(
-            pd.DataFrame(
-                {
-                    "entry_id": r["entry_id"].iloc[0],
-                    "fpl_id": ids,
-                    "element_type": typ[ids].to_numpy(),
-                    "multiplier": m.to_numpy(),
-                    "captain": cap[ids].to_numpy(),
-                }
-            )
-        )
-    return pd.concat(out, ignore_index=True)
+    r = rows[["entry_id", "fpl_id", "element_type"]].copy()
+    xi = rows["multiplier"].to_numpy() >= 1
+    r["captain"] = (rows["multiplier"].to_numpy() >= 2) * (1 - conc)
+    r["multiplier"] = xi + r["captain"]
+    # each manager's weakest starter per position, other than a herd target if they have one
+    s = r[xi].assign(xp=xp.reindex(r.loc[xi, "fpl_id"]).fillna(0.0).to_numpy())
+    s = s.sort_values(["xp", "fpl_id"], kind="stable")
+    weakest = pd.concat([s[~s["fpl_id"].isin(p.index)], s]).drop_duplicates(["entry_id", "element_type"])
+    entries = r["entry_id"].drop_duplicates()
+    adds = []
+    for c, share_c in p.items():
+        a = conc * share_c
+        starts = r.loc[xi & (r["fpl_id"] == c).to_numpy(), "entry_id"]
+        buyers = entries[~entries.isin(starts)]  # they buy (or start) him with probability a
+        out = weakest[(weakest["element_type"] == pos[c]) & weakest["entry_id"].isin(buyers)]
+        adds += [
+            pd.DataFrame({"entry_id": starts, "fpl_id": c, "element_type": pos[c], "multiplier": a, "captain": a}),
+            pd.DataFrame({"entry_id": buyers, "fpl_id": c, "element_type": pos[c], "multiplier": 2 * a, "captain": a}),
+            out[["entry_id", "fpl_id", "element_type"]].assign(multiplier=-a, captain=0.0),
+        ]
+    keys = ["entry_id", "fpl_id", "element_type"]
+    return pd.concat([r, *adds], ignore_index=True).groupby(keys, sort=False, as_index=False)[["multiplier", "captain"]].sum()
+
+
+def captain_shares(rows: pd.DataFrame) -> pd.Series:
+    """fpl_id -> share of the group's managers captaining him (multiplier 2+; triple captain counts once)."""
+    return rows[rows["multiplier"] >= 2].groupby("fpl_id")["entry_id"].nunique() / rows["entry_id"].nunique()
 
 
 def chip_managers(chips: pd.DataFrame, gw: int) -> set:

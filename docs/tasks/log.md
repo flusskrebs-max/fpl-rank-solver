@@ -134,3 +134,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
   `ownership.group_weights`), its line drift measured against the AE64/E64 part (top1000/top10k drift is biased low).
   The page gets a custom-mix option, his usual settings (time limit, horizon, chips, banned/locked, hits, pool) filled
   in from his settings files with only changes passed on, and a warning when team.json is ticked but missing.
+- 2026-10-13, EO1c (GW6): herding overdone in a four-way captain split (Haaland missed: Solio had him fifth). Herding
+  now spreads over all candidates by xP gap, can keep part of last GW's captaincy, and is ~200x faster; fitted on
+  GW2-6 leave-one-out neither change beat the current rule, so defaults stay (τ 0.3, ρ 0). eo-blend.md.
