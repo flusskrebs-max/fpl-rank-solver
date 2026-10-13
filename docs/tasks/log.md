@@ -143,3 +143,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, CLI 6: Alex asked about a .exe. A frozen PyInstaller build of the solver would be large, go stale with
   every merged PR and trip antivirus, and still needs git for updates; so instead `scripts/fplrank_page.cmd` (pull on
   main, `uv sync`, open the page) plus a desktop shortcut (weekly-run.md). `.gitattributes` keeps .cmd files CRLF.
+  Then a setup box on the page (`ui/setup.py`): git pull button, paste-and-save for the bookmarklet team, Solio
+  files from Downloads told apart by their columns (EO named by its first GW). Clicked through in a headless browser.
