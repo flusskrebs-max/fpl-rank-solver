@@ -49,7 +49,7 @@ The repo is the only memory: if it isn't committed, the next session won't know 
   settings, solve, simulations) through `fplrank solve`; don't rebuild any of that on our side.
 - `src/fplrank/cli.py`: `fplrank solve`. His `solve_regular` with his flags; `--eo/--target/--lam` scale his projections
   on read (next GW only), solve per λ, pick the best P(target) and print his output for that plan; `--sims N` runs
-  his simulations + sensitivity summary at that λ. `src/fplrank/upstream.py`: imports/patches his code.
+  his simulations + sensitivity summary at that λ. The solves run side by side in `--workers` spawned processes. `src/fplrank/upstream.py`: imports/patches his code.
 - `src/fplrank/ui/`: `uv run fplrank page`, a Streamlit page that only fills in `fplrank solve` flags, runs it and shows the output.
 - `src/fplrank/data/`: `fpl_api.py` (live API, saves dated snapshots), `historical.py` (vaastav
   season files),

@@ -137,3 +137,6 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, EO1c (GW6): herding overdone in a four-way captain split (Haaland missed: Solio had him fifth). Herding
   now spreads over all candidates by xP gap, can keep part of last GW's captaincy, and is ~200x faster; fitted on
   GW2-6 leave-one-out neither change beat the current rule, so defaults stay (τ 0.3, ρ 0). eo-blend.md.
+- 2026-10-13, PERF1: a `--target` run is 12 MILPs (9 λ, 3 wildcard templates) solved one after another, ~90% of
+  the time in HiGHS, which uses about one core per MILP. They now run side by side in `--workers` processes (default
+  half the logical CPUs, max 8), as do `--sims`; offline 8-GW benchmark 89s -> 41s on 4 cores, plans identical.

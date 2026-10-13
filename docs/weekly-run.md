@@ -68,10 +68,13 @@ Type your real team id in place of `<your team id>` (PowerShell rejects the `<`)
   (`docs/research/eo-horizon.md`).
 - `--sims 50` then runs his simulations 50 times at the chosen λ (his noise on the projections) and
   prints his summary of how often each move comes up. Leave it out for a quick run.
+- `--workers 4` sets how many solves run at once (the λs, the three wildcard templates and the simulations each
+  use about one CPU core). The default is half your logical CPUs, at most 8; each running solve needs roughly
+  300-500 MB of memory. `--workers 1` runs them one at a time as before. The plans are the same either way.
 - Any of his flags work as usual: `--horizon 5`, `--use_wc "[8]"`, `--banned "[...]"`, and so on.
   With no `--eo`, `--target` or `--lam` it is exactly his solver.
 
-It prints one line per λ as each solve finishes, then the EO used, the gap to the target line, P by λ,
+It prints one line per λ as each solve finishes (in the order they finish, with the time since the start), then the EO used, the gap to the target line, P by λ,
 and his normal output for the chosen plan.
 
 ### Or use the page
@@ -96,4 +99,5 @@ noise. Tell Claude in the project which plan you used and anything odd; it goes 
 
 - "No EO for group": the collector hasn't run since the group was added; use `--eo AE64` or `--eo solio`.
 - His solver can't find `solio.csv`: step 2 was missed or the file was saved under another name.
-- A solve takes much longer than a minute or two: lower `--horizon`, or leave out `--sims`.
+- A solve takes much longer than a minute or two: lower `--horizon`, or leave out `--sims`. If the PC runs short of
+  memory, lower `--workers`.

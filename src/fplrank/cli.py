@@ -16,17 +16,23 @@ P(reaching the target line) (`opt.rank_goal`) is printed with his normal output 
 `--sims N` then does what his `run/simulations.py` does, at the chosen λ: N runs of `solve_regular` with
 `randomized` on (his noise, applied to the λ-scaled projections), followed by his `run/sensitivity.py`
 summary of the plans those runs saved.
+
+The solves (each λ, the wildcard templates, the simulations) are independent MILPs and HiGHS solves each on about one
+core, so they run side by side in `--workers` processes (default: half the logical CPUs, at most 8). Each solve is the same as it would be
+on its own; `--workers 1` runs them one after another in this process, as before.
 """
 
 import argparse
 import contextlib
 import io
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -45,28 +51,150 @@ class Run:
     output: str  # what he printed ("" when not captured)
 
 
-def live_request():
-    """His `cached_request`, served by our FPL API client (saves a dated snapshot of every payload)."""
-    from fplrank.data.fpl_api import FplApi
+@dataclass
+class LiveRequest:
+    """His `cached_request`, served by our FPL API client (saves a dated snapshot of every payload). Picklable, so the
+    worker processes get the payloads already fetched and only go to the API for anything new."""
 
-    api = FplApi()
-    cache = {}
+    cache: dict = field(default_factory=dict)
+    api: object = None
 
-    def request(url):
+    def __call__(self, url):
         endpoint = url.split("/api/", 1)[1]
-        if endpoint not in cache:
-            cache[endpoint] = api.get(endpoint)
-        return cache[endpoint]
+        if endpoint not in self.cache:
+            if self.api is None:
+                from fplrank.data.fpl_api import FplApi
 
-    return request
+                self.api = FplApi()
+            self.cache[endpoint] = self.api.get(endpoint)
+        return self.cache[endpoint]
+
+    def __getstate__(self):
+        return {"cache": self.cache, "api": None}
 
 
-def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime_options: dict | None = None) -> Run:
+def live_request():
+    return LiveRequest()
+
+
+@dataclass
+class Replay:
+    """The payloads a request function served in this process, for a worker process: `fallback` (picklable, or None)
+    for anything not seen yet."""
+
+    seen: dict
+    fallback: object = None
+
+    def __call__(self, url):
+        if url not in self.seen:
+            if self.fallback is None:
+                raise KeyError(f"{url} was not fetched before the workers started")
+            self.seen[url] = self.fallback(url)
+        return self.seen[url]
+
+
+class Recorder:
+    """Wraps a request function and keeps what it served, so `replay()` can hand it to worker processes."""
+
+    def __init__(self, request):
+        self.request, self.seen = request, {}
+
+    def __call__(self, url):
+        if url not in self.seen:
+            self.seen[url] = self.request(url)
+        return self.seen[url]
+
+    def replay(self) -> Replay:
+        return Replay(dict(self.seen), self.request if isinstance(self.request, LiveRequest) else None)
+
+
+@dataclass
+class Adjust:
+    """λ on his projections (`ownership.adjust_projections`), as a picklable `adjust` for `run`."""
+
+    eo: pd.DataFrame | pd.Series
+    lam: float
+    gw: int
+    decay: float
+
+    def __call__(self, proj, _options):
+        return ownership.adjust_projections(proj, self.eo, self.lam, self.gw, self.decay)
+
+
+class Deferred:
+    """A job for `InlineExecutor`: it runs in this process when its result is first asked for."""
+
+    def __init__(self, fn, args, kwargs):
+        self.call, self.value, self.ran = (fn, args, kwargs), None, False
+
+    def result(self):
+        if not self.ran:
+            fn, args, kwargs = self.call
+            self.value, self.ran = fn(*args, **kwargs), True
+        return self.value
+
+
+class InlineExecutor:
+    """`--workers 1`: the jobs run one at a time in this process, in the order they were submitted."""
+
+    def submit(self, fn, *args, **kwargs) -> Deferred:
+        return Deferred(fn, args, kwargs)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+
+class Pool(ProcessPoolExecutor):
+    """A process pool that drops the jobs not yet started if the block fails (a solve that fails, Ctrl+C)."""
+
+    def __exit__(self, exc_type, *_):
+        self.shutdown(wait=True, cancel_futures=exc_type is not None)
+        return False
+
+
+def executor(workers: int, jobs: int):
+    """Process pool for `jobs` independent solves (spawned, as on Windows), or in this process for one worker."""
+    workers = max(1, min(workers, jobs))
+    if workers == 1:
+        return InlineExecutor()
+    import multiprocessing
+
+    return Pool(workers, mp_context=multiprocessing.get_context("spawn"))
+
+
+def finished(jobs):
+    """The jobs as they finish (in submission order for `InlineExecutor`, which runs them here as it goes)."""
+    if all(isinstance(j, Deferred) for j in jobs):
+        for j in jobs:
+            j.result()
+            yield j
+    else:
+        yield from as_completed(jobs)
+
+
+MAX_DEFAULT_WORKERS = 8  # each running solve holds roughly 300-500 MB
+
+
+def default_workers() -> int:
+    """Half the logical CPUs (about one per physical core, where HiGHS gains little from the second thread), at most
+    `MAX_DEFAULT_WORKERS`."""
+    return max(1, min((os.cpu_count() or 1) // 2, MAX_DEFAULT_WORKERS))
+
+
+class _Prepared(Exception):  # noqa: N818 (not an error: a dry run stops here)
+    pass
+
+
+def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime_options: dict | None = None, dry: bool = False) -> Run:
     """Run his `solve_regular` with `argv` as his command line.
 
     adjust(projections, options) -> projections changes his projections after he reads them.
     quiet: capture what he prints in `Run.output` instead of printing it.
     runtime_options: handed to `solve_regular` the way his simulations script does.
+    dry: stop before the solve (his options and projections only; `Run.solution` is None).
     """
     solve = solve_module()
     from dev import data_parser, solver
@@ -80,6 +208,8 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime
         return adjust(raw, options) if adjust else raw
 
     def keep(data, opts):
+        if dry:
+            raise _Prepared
         response = solve_mp(data, opts)
         solved.append(response)
         return response
@@ -96,16 +226,23 @@ def run(argv: list[str], adjust=None, request=None, quiet: bool = False, runtime
             contextlib.redirect_stdout(out) if quiet else contextlib.nullcontext(),
         ):
             solve.solve_regular(runtime_options)
+    except _Prepared:
+        pass
     finally:
         sys.argv = argv_was
-    return Run(solved[0][0], seen["options"], seen["projections"], out.getvalue())
+    return Run(solved[0][0] if solved else None, seen["options"], seen["projections"], out.getvalue())
 
 
-def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None) -> None:
+def _job(argv, adjust, request, runtime_options) -> Run:
+    """One quiet `run` in a worker process."""
+    return run(argv, adjust, request, quiet=True, runtime_options=runtime_options)
+
+
+def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None, workers: int = 1) -> None:
     """His `run/simulations.py` (n runs of `solve_regular` with `randomized` on), then his `run/sensitivity.py`
     summary for GW `gw`.
 
-    The runs go one at a time in this process (his default of 1 process) so `adjust` applies to each. His
+    The runs go side by side in `workers` processes (his `run_parallel.py` idea) with `adjust` applied in each. His
     results folder is left as is; only the plans these runs saved are copied out and summarised.
     """
     solve = solve_module()
@@ -116,9 +253,15 @@ def simulate(argv: list[str], n: int, gw: int, adjust=None, request=None) -> Non
     before = set(results.glob("*.csv"))
     options, start = {}, time.perf_counter()
     print(f"\n--- Sertalp's simulations: {n} runs ---")
-    for i in range(1, n + 1):
-        options = run(argv, adjust, request, quiet=True, runtime_options={"run_no": str(i), "randomized": True}).options
-        print(f"  {i}/{n} done ({time.perf_counter() - start:.0f}s)", flush=True)
+    if not isinstance(request, Replay):
+        request = Recorder(request)
+        run(argv, request=request, quiet=True, dry=True)  # fetch what his runs need once, here
+        request = request.replay()
+    with executor(workers, n) as pool:
+        jobs = [pool.submit(_job, argv, adjust, request, {"run_no": str(i), "randomized": True}) for i in range(1, n + 1)]
+        for i, done in enumerate(finished(jobs), 1):
+            options = done.result().options
+            print(f"  {i}/{n} done ({time.perf_counter() - start:.0f}s)", flush=True)
     wildcard = options.get("preseason") or gw in (options.get("use_wc") or [])
     with tempfile.TemporaryDirectory() as tmp:
         for f in set(results.glob("*.csv")) - before:
@@ -137,16 +280,17 @@ TEMPLATE_HORIZONS = (3, 5, 8)  # as naive_field's templates (eo-blend.md (e))
 TEMPLATE_SECS = 120  # time limit for each: a rough target, so near-optimal is plenty
 
 
-def wildcard_templates(argv: list[str], gw: int, request=None) -> pd.DataFrame:
+def wildcard_templates(argv: list[str], gw: int, request=None, pool=None) -> pd.DataFrame:
     """Where the field drifts to: his solver run with a wildcard in GW `gw` on our team (budget and all) at horizons
-    3, 5 and 8, other chips off, on his raw projections, at most `TEMPLATE_SECS` each. Returns (template, fpl_id,
-    element_type) for each GW `gw` squad.
+    3, 5 and 8, other chips off, on his raw projections, at most `TEMPLATE_SECS` each (side by side in `pool` if
+    given). Returns (template, fpl_id, element_type) for each GW `gw` squad.
     """
+    pool = pool or InlineExecutor()
+    chips = {"use_wc": [gw], "use_bb": [], "use_fh": [], "use_tc": []}
+    jobs = [pool.submit(_job, argv, None, request, {**chips, "horizon": h, "secs": TEMPLATE_SECS}) for h in TEMPLATE_HORIZONS]
     out = []
-    for i, h in enumerate(TEMPLATE_HORIZONS):
-        chips = {"use_wc": [gw], "use_bb": [], "use_fh": [], "use_tc": []}
-        r = run(argv, request=request, quiet=True, runtime_options={**chips, "horizon": h, "secs": TEMPLATE_SECS})
-        p = r.solution["picks"]
+    for i, job in enumerate(jobs):
+        p = job.result().solution["picks"]
         p = p[(p["week"] == gw) & (p["squad"] == 1)]
         out.append(pd.DataFrame({"template": i, "fpl_id": p["id"].astype(int), "element_type": p["type"].astype(int)}))
     return pd.concat(out, ignore_index=True)
@@ -186,6 +330,12 @@ def parser() -> argparse.ArgumentParser:
         help="later GWs' EO drifts towards three wildcard solves (default true; false = squads as now)",
     )
     p.add_argument("--sims", type=int, help="then run his simulations N times at the chosen λ and print his summary")
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=default_workers(),
+        help=f"solves run side by side in this many processes (default: half the logical CPUs, {default_workers()} here; 1 = in turn)",
+    )
     return p
 
 
@@ -196,7 +346,7 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     if ours.eo is None and ours.target is None and ours.lam is None:
         r = run(theirs, request=request)
         if ours.sims:
-            simulate(theirs, ours.sims, next_gw(r.options, request(BOOTSTRAP)), request=request)
+            simulate(theirs, ours.sims, next_gw(r.options, request(BOOTSTRAP)), request=request, workers=ours.workers)
         return 0
     if ours.target is None and ours.lam is None:
         p.error("--eo needs --target (to choose λ) or --lam (to fix it)")
@@ -208,24 +358,22 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
             p.error(str(e))
     lams = sorted({0.0} | ({ours.lam} if ours.lam is not None else set(ownership.SWEEP)), key=abs)
 
-    runs, eo, gw, eo_text = {}, None, None, ""
-    for i, lam in enumerate(lams, 1):
-        start = time.perf_counter()
-        if lam == 0.0:
-            runs[lam] = run(theirs, request=request, quiet=True)
-            gw = next_gw(runs[lam].options, request(BOOTSTRAP))
-            templates = None
-            if ours.eo_drift and ours.eo_decay:
-                templates = lambda gw=gw: wildcard_templates(theirs, gw, request)  # noqa: E731
-            eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, runs[lam].projections, templates=templates)
-        else:
-            runs[lam] = run(
-                theirs,
-                lambda proj, _, lam=lam, eo=eo, gw=gw: ownership.adjust_projections(proj, eo, lam, gw, ours.eo_decay),
-                request,
-                quiet=True,
-            )
-        print(f"  {i}/{len(lams)}: λ = {lam:g} solved in {time.perf_counter() - start:.0f}s", flush=True)
+    request = Recorder(request)
+    prepared = run(theirs, request=request, quiet=True, dry=True)  # his options and projections, before any solve
+    gw = next_gw(prepared.options, request(BOOTSTRAP))
+    replay = request.replay()  # what the workers need from the FPL API, fetched once here
+    drift = ours.eo_drift and ours.eo_decay
+    runs, start = {}, time.perf_counter()
+    with executor(ours.workers, len(lams) + (len(TEMPLATE_HORIZONS) if drift else 0)) as pool:
+        jobs = {pool.submit(_job, theirs, None, replay, None): 0.0}
+        templates = (lambda: wildcard_templates(theirs, gw, replay, pool)) if drift else None
+        eo, eo_text = load_eo(group, request(BOOTSTRAP), gw, prepared.projections, templates=templates)
+        for lam in lams[1:]:
+            jobs[pool.submit(_job, theirs, Adjust(eo, lam, gw, ours.eo_decay), replay, None)] = lam
+        for i, job in enumerate(finished(jobs), 1):
+            runs[jobs[job]] = job.result()
+            print(f"  {i}/{len(lams)}: λ = {jobs[job]:g} solved in {time.perf_counter() - start:.0f}s", flush=True)
+    runs = {lam: runs[lam] for lam in lams}
 
     base = runs[0.0]
     hit_cost = base.options.get("hit_cost", 4)
@@ -264,8 +412,8 @@ def solve(argv: list[str], request=None, load_eo=ownership.pick_eo, standing=Non
     print(f"\n--- Sertalp's solver, plan for λ = {chosen:g} ---")
     print(runs[chosen].output)
     if ours.sims:
-        adjust = None if chosen == 0 else lambda proj, _: ownership.adjust_projections(proj, eo, chosen, gw, ours.eo_decay)
-        simulate(theirs, ours.sims, gw, adjust, request)
+        adjust = None if chosen == 0 else Adjust(eo, chosen, gw, ours.eo_decay)
+        simulate(theirs, ours.sims, gw, adjust, replay, ours.workers)
     return 0
 
 
