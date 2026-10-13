@@ -152,3 +152,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
   `--eo` was forecasting from GW5 squads with no sign of it. The setup box now shows the squads' GW per group with a
   "Get the field's squads" button (`collect --no-transfers`, a third fewer requests), and `fplrank solve` warns when
   the squads are older than last GW. The two scheduled tasks were switched to headless on Alex's PC.
+- 2026-10-13: the page's update button and the launcher switch back to `main` (stashing uncommitted tracked changes)
+  before pulling, instead of refusing on another branch; a Claude session on Alex's PC had left it on its own branch.

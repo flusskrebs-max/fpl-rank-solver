@@ -95,3 +95,28 @@ def test_last_deadline(tmp_path):
     (folder / "20261001T000000Z.json").write_text(json.dumps({"events": events}))
     assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 13, tzinfo=UTC)) == 6
     assert setup.last_deadline(tmp_path, now=datetime(2026, 10, 1, tzinfo=UTC)) is None
+
+
+def test_update_code_switches_back_to_main(tmp_path, monkeypatch):
+    import subprocess
+
+    def sh(*args, cwd):
+        subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+    origin, clone = tmp_path / "origin", tmp_path / "clone"
+    sh("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    sh("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    sh("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "one", cwd=clone)
+    (clone / "f.txt").write_text("a")
+    sh("add", "f.txt", cwd=clone)
+    sh("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "on main", cwd=clone)
+    sh("push", "-q", "origin", "main", cwd=clone)
+    sh("reset", "-q", "--hard", "HEAD~1", cwd=clone)  # main is now one commit behind origin
+    sh("checkout", "-q", "-b", "claude/x", cwd=clone)
+    (clone / "g.txt").write_text("untracked, kept")
+    monkeypatch.setattr(setup, "PROJECT_ROOT", clone)
+
+    changed, out = setup.update_code()
+    assert changed and 'Switched from branch "claude/x" to main.' in out
+    assert setup.git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "main"
+    assert (clone / "f.txt").read_text() == "a" and (clone / "g.txt").exists()
