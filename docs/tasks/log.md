@@ -157,3 +157,5 @@ One line per finished task or decision from now on; detail belongs in the PR and
 - 2026-10-13, FS1b: `collect --squads` (the page button): standings plus each member's latest-GW picks only, 4 at a time at
   most 5 requests a second; `build` now takes picks from saved snapshots even without a history. The full run took ~85 min
   (history, transfers, every missing GW); the squads run is ~2,200 requests, about 5-10 min (estimate, not yet timed).
+- 2026-10-13, PERF1 follow-up: a chip GW past the horizon (Alex's BB in GW19 with GW7-14) crashed his solve with KeyError: 19;
+  `fplrank solve` now leaves such chip GWs out with a printed note (`cli.chips_in_horizon`).

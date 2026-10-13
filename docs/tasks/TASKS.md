@@ -35,7 +35,7 @@ Scope: we build only the EO projection and the λ choice; Sertalp's vendored sol
 | EO1b | `--eo` uses fair persistence re-picked on next-GW xP (XI and captain per manager, `model/eo_blend.py`) instead of last GW's EO, armband herded for AE64/E64 | [EO1b](../briefs/EO1b-repick-eo.md) | DONE (PR #42) |
 | EO1c | Recheck the herded re-pick against plain re-pick and persistence on GW6 (fresh file) and at ~GW10 | (none) | GW6 done (eo-blend.md); ~GW10 TODO, refit τ/ρ then |
 | RP1 | 2025-26 replay: run `fplrank solve` week by week on last season and record when λ changes the decision (moves, captain) vs the EV plan; also try centring the λ term at 50% EO instead of 100% (Alex, 2026-10-07) | (to write) | TODO |
-| PERF1 | Faster `fplrank solve`: the λ solves, wildcard templates and simulations run side by side (`--workers`), same plans (Alex, 2026-10-13) | (none) | IN REVIEW |
+| PERF1 | Faster `fplrank solve`: the λ solves, wildcard templates and simulations run side by side (`--workers`), same plans (Alex, 2026-10-13) | (none) | DONE (PR #50) |
 | Ship v0.4 | Logged real-deadline run with the re-picked EO | (none) | TODO |
 
 ## Parked (revisit once v0.4 is in use)
