@@ -107,7 +107,7 @@ def test_herd_splits_when_the_top_two_are_close():
     rows, xp = _group(n_c1=4, xp_lead=0.0)  # everyone owns 8 and 99, level on xP
     herd = eb.herd_captains(rows, xp, conc=1.0)
     cap = herd.groupby("fpl_id")["captain"].sum() / 4
-    assert cap[99] == pytest.approx(0.5) and cap[8] == pytest.approx(0.5)
+    assert cap[99] == pytest.approx(cap[8]) and cap[99] + cap[8] > 0.95  # 13 (a point behind) gets the rest
 
 
 def test_next_gw_eo_uses_the_latest_picks_before_the_gw():
@@ -116,3 +116,11 @@ def test_next_gw_eo_uses_the_latest_picks_before_the_gw():
     xp[13] = 9.0  # a forward: the re-picked captain
     eo, last = eb.next_gw_eo(picks, 4, xp)
     assert last == 3 and eo[13] == 2 and eo.sum() == 12
+
+
+def test_herd_keeps_last_gws_captain_with_weight_rho():
+    rows, xp = _group(n_c1=4, xp_lead=2.0)  # everyone owns 99, 2 points clear of 8
+    herd = eb.herd_captains(rows, xp, conc=1.0, prev=pd.Series({8: 1.0}), rho=0.5)
+    cap = herd.groupby("fpl_id")["captain"].sum() / 4
+    assert cap[8] == pytest.approx(0.5, abs=0.01) and cap[99] == pytest.approx(0.5, abs=0.01)
+    assert herd.groupby("entry_id")["multiplier"].sum().round(9).eq(12).all()

@@ -337,6 +337,33 @@ share, herded vs actual: AE64 97/98, 59 (Isak; actual Haaland 97), 88/98, 99/75;
 Palmer, the re-pick had João Pedro), 98/91. The stale projection file still picks the wrong AE64 GW3 captain,
 which no captain rule can fix. τ and conc were not tuned on these weeks.
 
+## Captain herding by the size of the race (EO1c, 2026-10-13)
+
+GW6 (fresh file) split the field: AE64 captained Saka 42%, Haaland 27%, Fernandes 20%, Palmer 9%; E64 34/31/22/9
+(Saka/Haaland/Palmer/Fernandes). Solio had Fernandes 6.38, Saka 6.24, Palmer 6.10 and Haaland only 5.48, so herding
+put 61% (AE64) and 84% (E64, Palmer) on one captain and almost none on Haaland. EO error, GW6, average per player:
+AE64 7.7 herded vs 5.8 plain re-pick, E64 10.6 vs 9.3, top 10k 4.7 (re-pick) vs 6.2 persistence and 7.8 Solio's EO.
+
+`herd_captains` now spreads the herd over every candidate by softmax(xP / τ) instead of a fixed two-way split, can
+mix in last GW's captain shares (weight ρ; captaincy is sticky), and is vectorised (~200x faster). 2025-26 couldn't
+be used for the fit: vaastav's xP is blank after GW9. Grid τ 0.3-2, ρ 0-0.6, conc 0.3-0.95, fitted per group on
+2026-27 GW2-6 leaving one GW out (GW3-5 on the stale GW02 file; GW6 actuals from Alex's top-10k CSV and the Solio
+graphic, unlisted players 0.1% / 0). Pass criterion: held-out EO error below the current rule.
+
+| held-out EO error, mean GW2-6 | fitted | current (τ 0.3, ρ 0) | plain re-pick |
+|---|---|---|---|
+| AE64 | 8.08 | 8.20 | 7.89 |
+| E64 | 7.15 | 6.79 | 7.25 |
+| top 1k (GW2-5) | 1.99 | | 1.94 |
+| top 10k | 2.59 | | 2.47 |
+
+It fails: the fit picks sharp herding (τ 0.3-0.5) and no persistence in most folds. Captain-share error says the
+same: best τ is 0.3 with ρ 0 for AE64 and E64. ρ 0.6 would have fixed GW6 (AE64 captain error 34 → 22, E64 66 →
+25, Haaland was GW5's captain) but costs more in GW2-5, where the consensus captain moved. GW6's miss is Solio's xP
+disagreeing with the field (Haaland fifth), which no rule on that xP alone can see. Defaults stay τ 0.3, ρ 0, so
+`--eo` behaves as before except that a third candidate within ~0.3 xP now shares the herd. Revisit ρ and τ at ~GW10
+with more split weeks; top 1k/10k stay unherded.
+
 ## Next
 
 - Score the herded re-pick on GW6 (fresh file) and again at ~GW10 (EO1c); refit τ only with more weeks.
