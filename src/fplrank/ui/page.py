@@ -4,9 +4,11 @@ Fills in the flags for `fplrank solve`, runs it as a separate process and shows 
 choices are kept in data/ui_settings.json (git-ignored) so the team id is there next week.
 """
 
+import contextlib
 import dataclasses
 import json
 import os
+import signal
 import subprocess
 import sys
 
@@ -164,6 +166,7 @@ def run(args: list[str], box, bar) -> tuple[int, str]:
         encoding="utf-8",
         errors="replace",
         env=env,
+        start_new_session=os.name != "nt",  # its own process group, so its solver processes can be stopped with it
     )
     lines = []
     try:
@@ -175,7 +178,16 @@ def run(args: list[str], box, bar) -> tuple[int, str]:
         return proc.wait(), "".join(lines)
     finally:
         if proc.poll() is None:
-            proc.kill()
+            stop(proc)
+
+
+def stop(proc: subprocess.Popen) -> None:
+    """Stop `fplrank solve` and the solver processes it started (`--workers`)."""
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGKILL)
 
 
 def results(output: str) -> None:
